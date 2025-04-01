@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Overlay Player</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+        }
+        
+        .player-container {
+            position: relative;
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+        
+        #videoElement {
+            width: 100%;
+            display: block;
+        }
+        
+        .overlay-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            display: none;
+        }
+        
+        #controls {
+            margin-top: 10px;
+            text-align: center;
+            padding: 10px;
+            background-color: #f8f3bf;
+            border-radius: 5px;
+        }
+        
+        #playButton {
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        
+        #playButton:hover {
+            background-color: #45a049;
+        }
+        
+        #replayButton {
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        #replayButton:hover {
+            background-color: #0b7dda;
+        }
+        
+        #statusMessage {
+            margin-top: 10px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .parent-instructions {
+            background-color: #f8f3bf;
+            border-radius: 5px;
+            padding: 10px 15px;
+            margin-top: 15px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .parent-instructions h3 {
+            margin-top: 5px;
+            margin-bottom: 5px;
+        }
+        
+        .control-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        /* Add CSS for next button similar to Lookit */
+        #nextButton {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #00ab6b;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            display: none;
+        }
+        
+        #nextButton:hover {
+            background-color: #008c58;
+        }
+    </style>
+</head>
+<body>
+    <div class="player-container" id="playerContainer">
+        <video id="videoElement" playsinline>
+            <source src="" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+        <!-- Overlay images will be added here dynamically -->
+    </div>
+    
+    <div id="controls">
+        <div class="control-buttons">
+            <button id="playButton">Play Video</button>
+            <button id="replayButton" class="hidden">Replay Video</button>
+            <button id="nextButton">Next</button>
+        </div>
+        <div id="statusMessage">Click "Play Video" to begin</div>
+    </div>
+    
+    <div class="parent-instructions" id="parentInstructions">
+        <h3>For Parents</h3>
+        <p>Please don't respond to anything on the screen. Feel free to replay the audio if your child was distracted. Please just say 'Okay!' when your child answers - don't give any hints or say whether you agree!</p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // DOM Elements
+            const playerContainer = document.getElementById('playerContainer');
+            const video = document.getElementById('videoElement');
+            const playButton = document.getElementById('playButton');
+            const replayButton = document.getElementById('replayButton');
+            const nextButton = document.getElementById('nextButton');
+            const statusMessage = document.getElementById('statusMessage');
+            const parentInstructions = document.getElementById('parentInstructions');
+            
+            // Get parameters from URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const videoId = urlParams.get('videoId') || 'in4_out2_CB01';
+            const showParentInstructions = urlParams.get('showParentInstructions') !== 'false';
+            const autoAdvance = urlParams.get('autoAdvance') === 'true';
+            const baseUrl = urlParams.get('baseUrl') || 'https://sociallearninglab.github.io/social_groups_lookit/test/';
+            
+            // Show parent instructions if needed
+            if (showParentInstructions) {
+                parentInstructions.style.display = 'block';
+            }
+            
+            // Video source
+            const videoSrc = baseUrl + videoId + '.mp4';
+            video.querySelector('source').src = videoSrc;
+            video.load();
+            
+            // Define overlay configuration - can be overridden by URL params
+            let overlayConfig = [];
+            
+            // Check if we have a predefined overlay configuration
+            if (videoId === 'in4_out2_CB01') {
+                // This is our test video, use the timestamps from the prompt
+                overlayConfig = [
+                    { imageSrc: baseUrl + 'slide_16.png', startTime: 54, endTime: 64 },
+                    { imageSrc: baseUrl + 'slide_19.png', startTime: 64, endTime: 74 },
+                    { imageSrc: baseUrl + 'slide_21.png', startTime: 74, endTime: 84 },
+                    { imageSrc: baseUrl + 'slide_23.png', startTime: 84, endTime: 95 },
+                    { imageSrc: baseUrl + 'slide_25.png', startTime: 95, endTime: 110 },
+                    { imageSrc: baseUrl + 'slide_28.png', startTime: 110.5, endTime: 120 },
+                    { imageSrc: baseUrl + 'slide_30.png', startTime: 120.5, endTime: 999 }
+                ];
+            } else {
+                // Check if overlay config is passed via URL
+                const configParam = urlParams.get('overlayConfig');
+                if (configParam) {
+                    try {
+                        overlayConfig = JSON.parse(decodeURIComponent(configParam));
+                    } catch (e) {
+                        console.error('Error parsing overlay config from URL:', e);
+                        statusMessage.textContent = 'Error loading configuration. Using default.';
+                    }
+                }
+            }
+            
+            // Create overlay images
+            overlayConfig.forEach((config, index) => {
+                const overlay = document.createElement('img');
+                overlay.src = config.imageSrc;
+                overlay.className = 'overlay-image';
+                overlay.id = `overlay-${index}`;
+                overlay.style.display = 'none';
+                playerContainer.appendChild(overlay);
+            });
+            
+            // Update overlay visibility based on current time
+            function updateOverlays() {
+                const currentTime = video.currentTime;
+                
+                // For debugging
+                const minutes = Math.floor(currentTime / 60);
+                const seconds = Math.floor(currentTime % 60);
+                statusMessage.textContent = `Time: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                overlayConfig.forEach((config, index) => {
+                    const overlay = document.getElementById(`overlay-${index}`);
+                    if (currentTime >= config.startTime && currentTime < config.endTime) {
+                        overlay.style.display = 'block';
+                    } else {
+                        overlay.style.display = 'none';
+                    }
+                });
+                
+                // Continue updating if video is playing
+                if (!video.paused) {
+                    requestAnimationFrame(updateOverlays);
+                }
+            }
+            
+            // Handle play button click
+            playButton.addEventListener('click', function() {
+                video.play()
+                    .then(() => {
+                        playButton.style.display = 'none';
+                        replayButton.classList.remove('hidden');
+                        updateOverlays();
+                    })
+                    .catch(error => {
+                        console.error('Error playing video:', error);
+                        statusMessage.textContent = 'Error playing video. Try again.';
+                    });
+            });
+            
+            // Handle replay button click
+            replayButton.addEventListener('click', function() {
+                video.currentTime = 0;
+                video.play()
+                    .then(() => {
+                        nextButton.style.display = 'none';
+                        updateOverlays();
+                    })
+                    .catch(error => {
+                        console.error('Error replaying video:', error);
+                        statusMessage.textContent = 'Error replaying video. Try again.';
+                    });
+            });
+            
+            // Handle next button click
+            nextButton.addEventListener('click', function() {
+                // Notify Lookit that we want to proceed
+                window.parent.postMessage({
+                    type: 'nextFrame'
+                }, '*');
+            });
+            
+            // Video ended event
+            video.addEventListener('ended', function() {
+                // Show next button when video ends
+                nextButton.style.display = 'inline-block';
+                
+                // Auto advance to next frame if specified
+                if (autoAdvance) {
+                    nextButton.click();
+                }
+                
+                // Notify parent for tracking purposes
+                try {
+                    window.parent.postMessage({
+                        type: 'videoEnded',
+                        videoId: videoId
+                    }, '*');
+                } catch (e) {
+                    console.error('Error posting message to parent:', e);
+                }
+            });
+            
+            // Listen for messages from parent frame (Lookit)
+            window.addEventListener('message', function(event) {
+                if (event.data && event.data.type) {
+                    switch (event.data.type) {
+                        case 'play':
+                            playButton.click();
+                            break;
+                        case 'replay':
+                            replayButton.click();
+                            break;
+                        case 'pause':
+                            video.pause();
+                            break;
+                        case 'setVideo':
+                            if (event.data.videoId) {
+                                window.location.href = window.location.pathname + '?videoId=' + 
+                                    event.data.videoId +
+                                    '&showParentInstructions=' + showParentInstructions +
+                                    '&autoAdvance=' + autoAdvance +
+                                    '&baseUrl=' + encodeURIComponent(baseUrl);
+                            }
+                            break;
+                    }
+                }
+            });
+            
+            // For debugging - log when we're ready
+            console.log('Video player initialized with:', { videoId, videoSrc, overlayConfig });
+        });
+    </script>
+</body>
+</html>
