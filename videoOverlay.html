@@ -1,207 +1,268 @@
-function generateProtocol(child, pastSessions) {
-    // Configure counterbalancing if needed
-    // For test purposes, we'll use a single condition
-    const condition = "CB01";
-    const videoId = `in4_out2_${condition}`;
-    
-    // Base directory for all assets
-    const baseDir = 'https://sociallearninglab.github.io/social_groups_lookit/test/';
-    
-    return {
-        // Define all the frames used in the study
-        frames: {
-            // Welcome frame
-            'welcome': {
-                'kind': 'exp-lookit-text',
-                'blocks': [
-                    {
-                        'title': 'Welcome to our Study!'
-                    },
-                    {
-                        'text': 'Thank you for your interest in our social groups study.'
-                    },
-                    {
-                        'text': 'Here\'s what will happen:'
-                    },
-                    {
-                        'text': '1. Webcam Setup and Video Consent: We\'ll check that your webcam is working, and you\'ll give consent for participation.'
-                    },
-                    {
-                        'text': '2. Study Overview: We\'ll explain what your child will be doing in this study.'
-                    },
-                    {
-                        'text': '3. Start the Study: You\'ll watch videos with your child showing teams of characters and their behaviors.'
-                    },
-                    {
-                        'text': 'This study will take about 10-15 minutes in total. Thank you for helping with our research!'
-                    }
-                ],
-                'showPreviousButton': false
-            },
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Overlay Player</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            overflow: hidden;
+        }
+        
+        .player-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        #videoElement {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+        
+        .overlay-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: none;
+        }
+        
+        #statusMessage {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 12px;
+            font-family: Arial, sans-serif;
+            z-index: 10;
+            pointer-events: none;
+            display: none; /* Hide status by default */
+        }
+        
+        #nextButton {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #00ab6b;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            display: none;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div class="player-container" id="playerContainer">
+        <video id="videoElement" playsinline>
+            <source src="" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+        <!-- Overlay images will be added here dynamically -->
+        <div id="statusMessage"></div>
+        <button id="nextButton">Next</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // DOM Elements
+            const playerContainer = document.getElementById('playerContainer');
+            const video = document.getElementById('videoElement');
+            const nextButton = document.getElementById('nextButton');
+            const statusMessage = document.getElementById('statusMessage');
             
-            // Video configuration and consent frames
-            'video-config': {
-                'kind': 'exp-video-config',
-                'troubleshootingIntro': 'If you\'re having any trouble getting your webcam set up, please feel free to contact us for help!'
-            },
+            // Get parameters from URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const videoId = urlParams.get('videoId') || 'in4_out2_CB01';
+            const autoAdvance = urlParams.get('autoAdvance') === 'true';
+            const baseUrl = urlParams.get('baseUrl') || 'https://sociallearninglab.github.io/social_groups_lookit/test/';
+            const showDebug = urlParams.get('debug') === 'true';
             
-            'video-consent': {
-                'kind': 'exp-lookit-video-consent',
-                'template': 'consent_005',
-                'PIName': 'Researcher Name',
-                'institution': 'Stanford University',
-                'PIContact': 'researcher@stanford.edu',
-                'purpose': 'Investigating how children understand social group dynamics.',
-                'procedures': 'Your child will watch short videos about characters in different groups.',
-                'risk_statement': 'There are no anticipated risks to participating in this study.',
-                'voluntary_participation': 'Participation is entirely voluntary, and you may exit at any time.',
-                'payment': 'You\'ll receive a $5 gift card as thanks for your participation.',
-                'datause': 'We\'ll analyze your child\'s reactions and responses to understand social cognition.',
-                'include_databrary': true,
-                'gdpr': false,
-                'research_rights_statement': 'For questions about your rights as a research participant, you may contact the Stanford IRB.'
-            },
+            // Show debug info if requested
+            if (showDebug) {
+                statusMessage.style.display = 'block';
+            }
             
-            'positioning': {
-                'kind': 'exp-video-config-quality',
-                'title': 'Positioning',
-                'introText': 'Let\'s get you and your child positioned comfortably.',
-                'showRecordMenu': false,
-                'requireTestVideo': false,
-                'completedItemText': 'Got it!',
-                'instructionBlocks': [
-                    {
-                        'text': 'You and your child can sit in any comfortable position.',
-                        'title': 'Get comfortable'
-                    },
-                    {
-                        'text': 'Make sure your child\'s whole face is in view of the webcam.',
-                        'title': 'Position yourselves'
-                    },
-                    {
-                        'text': 'Press the \'Next\' button when you\'re ready to continue.',
-                        'title': 'When you\'re ready'
-                    }
-                ],
-                'nextButtonText': 'We\'re ready to start!',
-                'showPreviousButton': true,
-                'requireItemConfirmation': true,
-                'recordingInstructionText': ''
-            },
+            // Video source
+            const videoSrc = baseUrl + videoId + '.mp4';
+            video.querySelector('source').src = videoSrc;
+            video.load();
             
-            'start-recording': {
-                'kind': 'exp-lookit-start-recording',
-                'imageAnimation': 'spin',
-                'displayFullscreen': true
-            },
+            // Define overlay configuration - can be overridden by URL params
+            let overlayConfig = [];
             
-            'stop-recording': {
-                'kind': 'exp-lookit-stop-recording',
-                'imageAnimation': 'spin',
-                'displayFullscreen': true
-            },
-            
-            // Introduction to study
-            'study-intro': {
-                'kind': 'exp-lookit-text',
-                'blocks': [
-                    {
-                        'title': 'About this Study'
-                    },
-                    {
-                        'text': 'In this study, your child will see videos of different teams and their behaviors.'
-                    },
-                    {
-                        'text': 'We\'re interested in how children understand social group dynamics.'
-                    },
-                    {
-                        'text': 'Please encourage your child to watch the videos, but don\'t provide hints or direct their responses.'
-                    },
-                    {
-                        'text': 'Click "Next" when you\'re ready to begin!'
-                    }
-                ],
-                'showPreviousButton': false
-            },
-            
-            // Our custom iframe with video and PNG overlays
-            'video-overlay-player': {
-                'kind': 'exp-lookit-iframe',
-                'id': 'video-overlay-test',
-                'iframeSrc': `https://sociallearninglab.github.io/social_groups_lookit/videoOverlay.html?videoId=${videoId}&autoAdvance=false&baseUrl=${encodeURIComponent(baseDir)}`,
-                'iframeHeight': '100vh',
-                'iframeWidth': '100%',
-                'allowFullscreen': true,
-                'autoProceed': false,
-                'nextButtonText': 'Continue',
-                'displayFullscreen': true,
-                'handleMediaPause': true,
-                'blockUI': true
-            },
-            
-            // Follow-up questions or tasks could be added here
-            'followup-questions': {
-                'kind': 'exp-lookit-survey',
-                'formSchema': {
-                    'schema': {
-                        'type': 'object',
-                        'title': 'Follow-up Questions',
-                        'properties': {
-                            'childThoughts': {
-                                'type': 'string',
-                                'title': 'What do you think your child understood about the teams?',
-                                'required': false
-                            },
-                            'comments': {
-                                'type': 'string',
-                                'title': 'Any other comments about the study?',
-                                'required': false
-                            }
+            // Check if we have a predefined overlay configuration
+            if (videoId === 'in4_out2_CB01') {
+                // This is our test video, use the timestamps from the prompt
+                overlayConfig = [
+                    { imageSrc: baseUrl + 'slide_16.png', startTime: 54, endTime: 64 },
+                    { imageSrc: baseUrl + 'slide_19.png', startTime: 64, endTime: 74 },
+                    { imageSrc: baseUrl + 'slide_21.png', startTime: 74, endTime: 84 },
+                    { imageSrc: baseUrl + 'slide_23.png', startTime: 84, endTime: 95 },
+                    { imageSrc: baseUrl + 'slide_25.png', startTime: 95, endTime: 110 },
+                    { imageSrc: baseUrl + 'slide_28.png', startTime: 110.5, endTime: 120 },
+                    { imageSrc: baseUrl + 'slide_30.png', startTime: 120.5, endTime: 999 }
+                ];
+            } else {
+                // Check if overlay config is passed via URL
+                const configParam = urlParams.get('overlayConfig');
+                if (configParam) {
+                    try {
+                        overlayConfig = JSON.parse(decodeURIComponent(configParam));
+                    } catch (e) {
+                        console.error('Error parsing overlay config from URL:', e);
+                        if (showDebug) {
+                            statusMessage.textContent = 'Error loading configuration. Using default.';
                         }
                     }
-                },
-                'nextButtonText': 'Submit'
-            },
-            
-            // Exit/Thank you
-            'exit-survey': {
-                'kind': 'exp-lookit-exit-survey',
-                'debriefing': {
-                    'title': 'Thank you for participating!',
-                    'blocks': [
-                        {
-                            'title': '',
-                            'text': 'This research wouldn\'t be possible without families like yours.'
-                        },
-                        {
-                            'title': 'Study Purpose:',
-                            'text': 'We\'re investigating how children understand group dynamics and social categories.'
-                        },
-                        {
-                            'title': 'Compensation:',
-                            'text': 'You\'ll receive a $5 gift card as thanks for your participation within the next week.'
-                        },
-                        {
-                            'title': 'Questions?',
-                            'text': 'Please contact us at researcher@stanford.edu if you have any questions.'
-                        }
-                    ]
                 }
             }
-        },
-        
-        // Sequence of frames - determines order of the study
-        sequence: [
-            'welcome',
-            'video-config',
-            'video-consent',
-            'positioning',
-            'start-recording',
-            'study-intro',
-            'video-overlay-player',
-            'followup-questions',
-            'stop-recording',
-            'exit-survey'
-        ]
-    };
-}
+            
+            // Create overlay images
+            overlayConfig.forEach((config, index) => {
+                const overlay = document.createElement('img');
+                overlay.src = config.imageSrc;
+                overlay.className = 'overlay-image';
+                overlay.id = `overlay-${index}`;
+                overlay.style.display = 'none';
+                playerContainer.appendChild(overlay);
+            });
+            
+            // Update overlay visibility based on current time
+            function updateOverlays() {
+                const currentTime = video.currentTime;
+                
+                // For debugging
+                if (showDebug) {
+                    const minutes = Math.floor(currentTime / 60);
+                    const seconds = Math.floor(currentTime % 60);
+                    statusMessage.textContent = `Time: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                }
+                
+                overlayConfig.forEach((config, index) => {
+                    const overlay = document.getElementById(`overlay-${index}`);
+                    if (currentTime >= config.startTime && currentTime < config.endTime) {
+                        overlay.style.display = 'block';
+                    } else {
+                        overlay.style.display = 'none';
+                    }
+                });
+                
+                // Continue updating if video is playing
+                if (!video.paused) {
+                    requestAnimationFrame(updateOverlays);
+                }
+            }
+            
+            // Handle next button click
+            nextButton.addEventListener('click', function() {
+                // Notify Lookit that we want to proceed
+                window.parent.postMessage({
+                    type: 'nextFrame'
+                }, '*');
+            });
+            
+            // Auto-play when loaded
+            video.addEventListener('loadedmetadata', function() {
+                // Try to play automatically
+                video.play()
+                    .then(() => {
+                        updateOverlays();
+                        console.log('Video started playing automatically');
+                    })
+                    .catch(error => {
+                        console.error('Auto-play failed:', error);
+                        // Show a message or add a play button if needed
+                        if (showDebug) {
+                            statusMessage.textContent = 'Auto-play blocked. Click anywhere to play.';
+                        }
+                        
+                        // Allow clicking anywhere to play (mobile devices often require user interaction)
+                        document.body.addEventListener('click', function playHandler() {
+                            video.play()
+                                .then(() => {
+                                    updateOverlays();
+                                    document.body.removeEventListener('click', playHandler);
+                                })
+                                .catch(e => console.error('Play failed again:', e));
+                        }, { once: false });
+                    });
+            });
+            
+            // Video ended event
+            video.addEventListener('ended', function() {
+                // Show next button when video ends
+                nextButton.style.display = 'inline-block';
+                
+                // Auto advance to next frame if specified
+                if (autoAdvance) {
+                    nextButton.click();
+                }
+                
+                // Notify parent for tracking purposes
+                try {
+                    window.parent.postMessage({
+                        type: 'videoEnded',
+                        videoId: videoId
+                    }, '*');
+                } catch (e) {
+                    console.error('Error posting message to parent:', e);
+                }
+            });
+            
+            // Request fullscreen on first interaction (many browsers require user interaction)
+            function tryEnterFullscreen() {
+                if (!document.fullscreenElement) {
+                    playerContainer.requestFullscreen()
+                        .catch(e => console.error('Fullscreen failed:', e));
+                }
+            }
+            
+            // Try to go fullscreen on user interaction
+            playerContainer.addEventListener('click', tryEnterFullscreen);
+            
+            // Listen for messages from parent frame (Lookit)
+            window.addEventListener('message', function(event) {
+                if (event.data && event.data.type) {
+                    switch (event.data.type) {
+                        case 'play':
+                            video.play()
+                                .then(() => updateOverlays())
+                                .catch(e => console.error('Play from message failed:', e));
+                            break;
+                        case 'pause':
+                            video.pause();
+                            break;
+                        case 'setVideo':
+                            if (event.data.videoId) {
+                                window.location.href = window.location.pathname + '?videoId=' + 
+                                    event.data.videoId +
+                                    '&autoAdvance=' + autoAdvance +
+                                    '&baseUrl=' + encodeURIComponent(baseUrl);
+                            }
+                            break;
+                        case 'requestFullscreen':
+                            tryEnterFullscreen();
+                            break;
+                    }
+                }
+            });
+            
+            // For debugging - log when we're ready
+            console.log('Video player initialized with:', { videoId, videoSrc, overlayConfig });
+        });
+    </script>
+</body>
+</html>
