@@ -37,30 +37,11 @@
         }
         
         #statusMessage {
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            color: rgba(255, 255, 255, 0.5);
-            font-size: 12px;
-            font-family: Arial, sans-serif;
-            z-index: 10;
-            pointer-events: none;
             display: none;
         }
         
         #nextButton {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: #00ab6b;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
             display: none;
-            z-index: 100;
         }
         
         #initialPlayButton {
@@ -76,9 +57,6 @@
             border-radius: 8px;
             cursor: pointer;
             z-index: 200;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
         
         #initialPlayButton:hover {
@@ -88,47 +66,44 @@
 </head>
 <body>
     <div class="player-container" id="playerContainer">
-        <video id="videoElement" playsinline>
+        <video id="videoElement" playsinline preload="auto">
             <source src="" type="video/mp4">
             Your browser does not support the video tag.
         </video>
         
-        <div id="statusMessage"></div>
-        <button id="nextButton">Next</button>
         <button id="initialPlayButton">Start Story</button>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // DOM Elements
+            // grab all the elements
             const playerContainer = document.getElementById('playerContainer');
             const video = document.getElementById('videoElement');
-            const nextButton = document.getElementById('nextButton');
-            const statusMessage = document.getElementById('statusMessage');
+            const initialPlayButton = document.getElementById('initialPlayButton');
             
-            // Get parameters from URL
+            // get stuff from the URL
             const urlParams = new URLSearchParams(window.location.search);
             const videoId = urlParams.get('videoId') || 'in4_out2_CB01';
             const autoAdvance = urlParams.get('autoAdvance') === 'true';
             const baseUrl = urlParams.get('baseUrl') || 'https://sociallearninglab.github.io/social_groups_lookit/test/';
-            const showDebug = urlParams.get('debug') === 'true';
             
-            // Show debug info if requested
-            if (showDebug) {
-                statusMessage.style.display = 'block';
-            }
-            
-            // Video source
+            // set up the video source
             const videoSrc = baseUrl + videoId + '.mp4';
             video.querySelector('source').src = videoSrc;
+            
+            // load the video
             video.load();
             
-            // Define overlay configuration - can be overridden by URL params
+            // set current time to 0 to show first frame
+            video.addEventListener('loadedmetadata', function() {
+                video.currentTime = 0;
+            });
+            
+            // list of overlays and when to show them
             let overlayConfig = [];
             
-            // Check if we have a predefined overlay configuration
+            // set up our test video timings
             if (videoId === 'in4_out2_CB01') {
-                // This is our test video, use the timestamps from the prompt
                 overlayConfig = [
                     { imageSrc: baseUrl + 'slide_16.png', startTime: 54, endTime: 64 },
                     { imageSrc: baseUrl + 'slide_19.png', startTime: 64, endTime: 74 },
@@ -139,21 +114,18 @@
                     { imageSrc: baseUrl + 'slide_30.png', startTime: 120, endTime: 136 }
                 ];
             } else {
-                // Check if overlay config is passed via URL
+                // try to get overlay config from URL
                 const configParam = urlParams.get('overlayConfig');
                 if (configParam) {
                     try {
                         overlayConfig = JSON.parse(decodeURIComponent(configParam));
                     } catch (e) {
-                        console.error('Error parsing overlay config from URL:', e);
-                        if (showDebug) {
-                            statusMessage.textContent = 'Error loading configuration. Using default.';
-                        }
+                        console.error('Error parsing overlay config:', e);
                     }
                 }
             }
             
-            // Create overlay images
+            // create all the overlay images
             overlayConfig.forEach((config, index) => {
                 const overlay = document.createElement('img');
                 overlay.src = config.imageSrc;
@@ -163,17 +135,11 @@
                 playerContainer.appendChild(overlay);
             });
             
-            // Update overlay visibility based on current time
+            // show/hide overlays based on video time
             function updateOverlays() {
                 const currentTime = video.currentTime;
                 
-                // For debugging
-                if (showDebug) {
-                    const minutes = Math.floor(currentTime / 60);
-                    const seconds = Math.floor(currentTime % 60);
-                    statusMessage.textContent = `Time: ${minutes}:${seconds.toString().padStart(2, '0')}`;
-                }
-                
+                // check each overlay to see if it should be visible
                 overlayConfig.forEach((config, index) => {
                     const overlay = document.getElementById(`overlay-${index}`);
                     if (currentTime >= config.startTime && currentTime < config.endTime) {
@@ -183,82 +149,35 @@
                     }
                 });
                 
-                // Continue updating if video is playing
+                // keep updating while video plays
                 if (!video.paused) {
                     requestAnimationFrame(updateOverlays);
                 }
             }
             
-            // Handle next button click
-            nextButton.addEventListener('click', function() {
-                // Notify Lookit that we want to proceed
-                window.parent.postMessage({
-                    type: 'nextFrame'
-                }, '*');
-            });
+
             
-            // Get initial play button
-            const initialPlayButton = document.getElementById('initialPlayButton');
-            
-            // Handle initial play button click
+            // start playing when clicked
             initialPlayButton.addEventListener('click', function() {
                 video.play()
                     .then(() => {
                         updateOverlays();
                         initialPlayButton.style.display = 'none';
-                        tryEnterFullscreen();
-                        console.log('Video started playing after button click');
                     })
                     .catch(error => {
-                        console.error('Play failed after button click:', error);
-                        if (showDebug) {
-                            statusMessage.textContent = 'Play failed. Please try again.';
-                        }
+                        console.error('Play failed:', error);
                     });
             });
             
-            // Don't try to auto-play - modern browsers block this without user interaction
             
-            // Video ended event
-            video.addEventListener('ended', function() {
-                // Show next button when video ends
-                nextButton.style.display = 'inline-block';
-                
-                // Auto advance to next frame if specified
-                if (autoAdvance) {
-                    nextButton.click();
-                }
-                
-                // Notify parent for tracking purposes
-                try {
-                    window.parent.postMessage({
-                        type: 'videoEnded',
-                        videoId: videoId
-                    }, '*');
-                } catch (e) {
-                    console.error('Error posting message to parent:', e);
-                }
-            });
             
-            // Request fullscreen on first interaction (many browsers require user interaction)
-            function tryEnterFullscreen() {
-                if (!document.fullscreenElement) {
-                    playerContainer.requestFullscreen()
-                        .catch(e => console.error('Fullscreen failed:', e));
-                }
-            }
-            
-            // Try to go fullscreen on user interaction
-            playerContainer.addEventListener('click', tryEnterFullscreen);
-            
-            // Listen for messages from parent frame (Lookit)
             window.addEventListener('message', function(event) {
                 if (event.data && event.data.type) {
                     switch (event.data.type) {
                         case 'play':
                             video.play()
                                 .then(() => updateOverlays())
-                                .catch(e => console.error('Play from message failed:', e));
+                                .catch(e => console.error('Play failed:', e));
                             break;
                         case 'pause':
                             video.pause();
@@ -271,15 +190,10 @@
                                     '&baseUrl=' + encodeURIComponent(baseUrl);
                             }
                             break;
-                        case 'requestFullscreen':
-                            tryEnterFullscreen();
-                            break;
+
                     }
                 }
             });
-            
-            // For debugging - log when we're ready
-            console.log('Video player initialized with:', { videoId, videoSrc, overlayConfig });
         });
     </script>
 </body>
