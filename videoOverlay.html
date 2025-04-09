@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Video Overlay Player</title>
     <style>
-        <style>
         html, body, iframe {
             margin: 0 !important;
             padding: 0 !important;
@@ -89,6 +88,12 @@
             Your browser does not support the video tag.
         </video>
         
+        <!-- Hidden audio element for background music -->
+        <audio id="backgroundAudio" preload="auto">
+            <source src="" type="audio/mpeg">
+            Your browser does not support the audio element.
+        </audio>
+        
         <button id="initialPlayButton">Start Story</button>
     </div>
 
@@ -97,11 +102,13 @@
             // grab all the elements
             const playerContainer = document.getElementById('playerContainer');
             const video = document.getElementById('videoElement');
+            const audio = document.getElementById('backgroundAudio');
             const initialPlayButton = document.getElementById('initialPlayButton');
             
             // get stuff from the URL
             const urlParams = new URLSearchParams(window.location.search);
             const videoId = urlParams.get('videoId') || 'in4_out2_CB01_slow';
+            const audioId = urlParams.get('audioId') || 'song';
             const autoAdvance = urlParams.get('autoAdvance') === 'true';
             const baseUrl = urlParams.get('baseUrl') || 'https://sociallearninglab.github.io/social_groups_lookit/test/';
             
@@ -109,8 +116,13 @@
             const videoSrc = baseUrl + videoId + '.mp4';
             video.querySelector('source').src = videoSrc;
             
-            // load the video
+            // set up the audio source
+            const audioSrc = baseUrl + audioId + '.mp3';
+            audio.querySelector('source').src = audioSrc;
+            
+            // load the media
             video.load();
+            audio.load();
             
             // set current time to 0 to show first frame
             video.addEventListener('loadedmetadata', function() {
@@ -173,42 +185,76 @@
                 }
             }
             
-
-            
             // start playing when clicked
             initialPlayButton.addEventListener('click', function() {
+                // First try to play the video
                 video.play()
                     .then(() => {
                         updateOverlays();
                         initialPlayButton.style.display = 'none';
+                        
+                        // After video starts, start the audio
+                        audio.play()
+                            .then(() => {
+                                console.log('Audio playing successfully');
+                            })
+                            .catch(error => {
+                                console.error('Audio play failed:', error);
+                            });
                     })
                     .catch(error => {
-                        console.error('Play failed:', error);
+                        console.error('Video play failed:', error);
                     });
             });
             
+            // When video ends, stop the audio too
+            video.addEventListener('ended', function() {
+                audio.pause();
+                audio.currentTime = 0;
+                
+                if (autoAdvance) {
+                    // tell lookit to move to next frame
+                    window.parent.postMessage({
+                        type: 'nextFrame'
+                    }, '*');
+                }
+            });
             
+            // Sync audio with video if either gets paused
+            video.addEventListener('pause', function() {
+                audio.pause();
+            });
             
+            video.addEventListener('play', function() {
+                audio.play().catch(e => console.error('Audio resume failed:', e));
+            });
+            
+            // Message handler for lookit
             window.addEventListener('message', function(event) {
                 if (event.data && event.data.type) {
                     switch (event.data.type) {
                         case 'play':
                             video.play()
-                                .then(() => updateOverlays())
-                                .catch(e => console.error('Play failed:', e));
+                                .then(() => {
+                                    updateOverlays();
+                                    audio.play().catch(e => console.error('Audio play failed:', e));
+                                })
+                                .catch(e => console.error('Video play failed:', e));
                             break;
                         case 'pause':
                             video.pause();
+                            audio.pause();
                             break;
                         case 'setVideo':
                             if (event.data.videoId) {
+                                const newAudioId = event.data.audioId || audioId;
                                 window.location.href = window.location.pathname + '?videoId=' + 
                                     event.data.videoId +
+                                    '&audioId=' + newAudioId +
                                     '&autoAdvance=' + autoAdvance +
                                     '&baseUrl=' + encodeURIComponent(baseUrl);
                             }
                             break;
-
                     }
                 }
             });
