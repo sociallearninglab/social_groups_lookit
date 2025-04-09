@@ -106,7 +106,7 @@
             const baseUrl = urlParams.get('baseUrl') || 'https://sociallearninglab.github.io/social_groups_lookit/test/';
             
             // set up the video source
-            const videoSrc = baseUrl + videoId + '.mp4';
+            const videoSrc = baseUrl + videoId + '.mov';
             video.querySelector('source').src = videoSrc;
             
             // load the video
@@ -121,7 +121,18 @@
             let overlayConfig = [];
             
             // set up our test video timings
-            if (videoId === 'in4_out2_CB01') {
+            if (videoId === 'in4_out2_CB01_slow') {
+                overlayConfig = [
+                    { imageSrc: baseUrl + 'slide_16.png', startTime: 118.5, endTime: 144 },
+                    { imageSrc: baseUrl + 'slide_19.png', startTime: 144, endTime: 167 },
+                    { imageSrc: baseUrl + 'slide_21.png', startTime: 167, endTime: 192 },
+                    { imageSrc: baseUrl + 'slide_23.png', startTime: 192, endTime: 220 },
+                    { imageSrc: baseUrl + 'slide_25.png', startTime: 220, endTime: 256 },
+                    { imageSrc: baseUrl + 'slide_28.png', startTime: 256, endTime: 279 },
+                    { imageSrc: baseUrl + 'slide_30.png', startTime: 279, endTime: 136 }
+                ];
+            } 
+            elif (videoId === 'in4_out2_CB02') {
                 overlayConfig = [
                     { imageSrc: baseUrl + 'slide_16.png', startTime: 54, endTime: 64 },
                     { imageSrc: baseUrl + 'slide_19.png', startTime: 64, endTime: 74 },
@@ -131,7 +142,8 @@
                     { imageSrc: baseUrl + 'slide_28.png', startTime: 110, endTime: 120 },
                     { imageSrc: baseUrl + 'slide_30.png', startTime: 120, endTime: 136 }
                 ];
-            } else {
+            }
+            else {
                 // try to get overlay config from URL
                 const configParam = urlParams.get('overlayConfig');
                 if (configParam) {
