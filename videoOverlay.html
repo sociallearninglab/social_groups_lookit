@@ -131,19 +131,7 @@
                     { imageSrc: baseUrl + 'slide_28.png', startTime: 256, endTime: 279 },
                     { imageSrc: baseUrl + 'slide_30.png', startTime: 279, endTime: 320 }
                 ];
-            } 
-            elif (videoId === 'in4_out2_CB02') {
-                overlayConfig = [
-                    { imageSrc: baseUrl + 'slide_16.png', startTime: 54, endTime: 64 },
-                    { imageSrc: baseUrl + 'slide_19.png', startTime: 64, endTime: 74 },
-                    { imageSrc: baseUrl + 'slide_21.png', startTime: 74, endTime: 84 },
-                    { imageSrc: baseUrl + 'slide_23.png', startTime: 84, endTime: 95 },
-                    { imageSrc: baseUrl + 'slide_25.png', startTime: 95, endTime: 110 },
-                    { imageSrc: baseUrl + 'slide_28.png', startTime: 110, endTime: 120 },
-                    { imageSrc: baseUrl + 'slide_30.png', startTime: 120, endTime: 136 }
-                ];
-            }
-            else {
+            } else {
                 // try to get overlay config from URL
                 const configParam = urlParams.get('overlayConfig');
                 if (configParam) {
