@@ -120,21 +120,22 @@
             // Base paths - using relative paths for web compatibility
             const BASE_PATH = "";  // Empty for relative paths
             const VIDEO_PATH = `${BASE_PATH}/mp4`;
-            const IMG_PATH = `${BASE_PATH}/img/processed/three_factor_images`;
+            const IMG_PATH = `${BASE_PATH}/img/processed/retained_images`;
             
             // Get URL parameters
             const urlParams = new URLSearchParams(window.location.search);
             const debugMode = urlParams.get('debug') === 'true';
-            const fixedCondition = urlParams.get('condition');
+            const fixedVersion = urlParams.get('version');
             const fixedCB = urlParams.get('cb');
             const autoAdvance = urlParams.get('autoAdvance') === 'true';
             
-            // Define experiment conditions
-            const conditions = ['group_CD', 'group_Cx', 'group_xD', 'pref_CD', 'pref_Cx', 'pref_xD'];
+            // Define available experiment modes and versions
+            const experimentModes = ['group', 'pref']; // First-level selection: group or preference task
+            const experimentVersions = ['CD', 'Cx', 'xD']; // Second-level selection: which version
             
-            // Define counterbalances to keep for each condition type
-            const groupCounterbalances = ['01', '02', '05', '06', '09', '10', '13', '14']; // For group conditions
-            const prefCounterbalances = ['01', '03', '05', '07', '09', '11', '13', '15']; // For pref conditions
+            // Define available counterbalances for each mode
+            const groupCounterbalances = ['01', '02', '05', '06', '09', '10', '13', '14']; 
+            const prefCounterbalances = ['01', '03', '05', '07', '09', '11', '13', '15'];
             
             // Define overlay image timings (in seconds)
             const overlayTimings = [
@@ -154,130 +155,39 @@
                 return array[Math.floor(Math.random() * array.length)];
             }
             
-            // Randomly assign condition and counterbalance
-            let selectedCondition = fixedCondition || getRandomElement(conditions);
-            let isGroupCondition = selectedCondition.startsWith('group');
+            // Step 1: Randomly assign experiment mode (group or pref)
+            let experimentMode = fixedVersion ? 
+                (fixedVersion.includes('group') ? 'group' : 'pref') : 
+                getRandomElement(experimentModes);
             
-            // Select counterbalance based on condition type
-            let selectedCB = fixedCB || (isGroupCondition ? 
+            // Step 2: Randomly select one of the 8 counterbalances for this mode
+            let selectedCB = fixedCB || (experimentMode === 'group' ? 
                 getRandomElement(groupCounterbalances) : 
                 getRandomElement(prefCounterbalances));
             
-            // Parse the condition and CB to get the factors
-            function getFactorsFromCB(condition, cb) {
-                // For reference, the key order is:
-                // 1) Which fruit is the predicted response (kiki/bubba)
-                // 2) Which team is the predicted response (red/blue)
-                // 3) Which fruit is on the left (kiki/bubba)
-                // 4) Which team was presented first (red/blue)
-                
-                let factors = {
-                    predictedFruit: null,
-                    predictedTeam: null,
-                    fruitLeft: null,
-                    teamFirst: null
-                };
-                
-                // Set factors based on known counterbalances
-                // Group conditions (gazorp always likes kiki)
-                if (condition.startsWith('group')) {
-                    factors.predictedFruit = 'Kiki'; // Always kiki for group conditions
-                    
-                    // Map CB to factors based on the key you provided
-                    if (cb === '01') {
-                        factors.predictedTeam = 'Red';
-                        factors.fruitLeft = 'Kiki';
-                        factors.teamFirst = 'Red';
-                    } else if (cb === '02') {
-                        factors.predictedTeam = 'Blue';
-                        factors.fruitLeft = 'Kiki';
-                        factors.teamFirst = 'Red';
-                    } else if (cb === '05') {
-                        factors.predictedTeam = 'Red';
-                        factors.fruitLeft = 'Kiki';
-                        factors.teamFirst = 'Blue';
-                    } else if (cb === '06') {
-                        factors.predictedTeam = 'Blue';
-                        factors.fruitLeft = 'Kiki';
-                        factors.teamFirst = 'Blue';
-                    } else if (cb === '09') {
-                        factors.predictedTeam = 'Red';
-                        factors.fruitLeft = 'Bubba';
-                        factors.teamFirst = 'Red';
-                    } else if (cb === '10') {
-                        factors.predictedTeam = 'Blue';
-                        factors.fruitLeft = 'Bubba';
-                        factors.teamFirst = 'Red';
-                    } else if (cb === '13') {
-                        factors.predictedTeam = 'Red';
-                        factors.fruitLeft = 'Bubba';
-                        factors.teamFirst = 'Blue';
-                    } else if (cb === '14') {
-                        factors.predictedTeam = 'Blue';
-                        factors.fruitLeft = 'Bubba';
-                        factors.teamFirst = 'Blue';
-                    }
-                } 
-                // Preference conditions (always asking about red gazorp)
-                else if (condition.startsWith('pref')) {
-                    factors.predictedTeam = 'Red'; // Always red for pref conditions
-                    
-                    if (cb === '01') {
-                        factors.predictedFruit = 'Kiki';
-                        factors.fruitLeft = 'Kiki';
-                        factors.teamFirst = 'Red';
-                    } else if (cb === '03') {
-                        factors.predictedFruit = 'Bubba';
-                        factors.fruitLeft = 'Kiki';
-                        factors.teamFirst = 'Red';
-                    } else if (cb === '05') {
-                        factors.predictedFruit = 'Kiki';
-                        factors.fruitLeft = 'Kiki';
-                        factors.teamFirst = 'Blue';
-                    } else if (cb === '07') {
-                        factors.predictedFruit = 'Bubba';
-                        factors.fruitLeft = 'Kiki';
-                        factors.teamFirst = 'Blue';
-                    } else if (cb === '09') {
-                        factors.predictedFruit = 'Kiki';
-                        factors.fruitLeft = 'Bubba';
-                        factors.teamFirst = 'Red';
-                    } else if (cb === '11') {
-                        factors.predictedFruit = 'Bubba';
-                        factors.fruitLeft = 'Bubba';
-                        factors.teamFirst = 'Red';
-                    } else if (cb === '13') {
-                        factors.predictedFruit = 'Kiki';
-                        factors.fruitLeft = 'Bubba';
-                        factors.teamFirst = 'Blue';
-                    } else if (cb === '15') {
-                        factors.predictedFruit = 'Bubba';
-                        factors.fruitLeft = 'Bubba';
-                        factors.teamFirst = 'Blue';
-                    }
-                }
-                
-                return factors;
-            }
+            // Step 3: Randomly select which version (CD, Cx, xD)
+            let experimentVersion = fixedVersion ? 
+                (fixedVersion.includes('CD') ? 'CD' : 
+                 fixedVersion.includes('Cx') ? 'Cx' : 'xD') : 
+                getRandomElement(experimentVersions);
             
-            // Get the factors for the selected condition and CB
-            const experimentFactors = getFactorsFromCB(selectedCondition, selectedCB);
+            // Construct the full condition string (e.g., "group_CD")
+            let selectedCondition = `${experimentMode}_${experimentVersion}`;
             
-            // Build the video filename based on factors
-            const videoFilename = isGroupCondition ?
-                `group_${experimentFactors.predictedFruit}_${experimentFactors.predictedTeam}_${experimentFactors.fruitLeft}_${experimentFactors.teamFirst}.mp4` :
-                `pref_${experimentFactors.predictedFruit}_${experimentFactors.predictedTeam}_${experimentFactors.fruitLeft}_${experimentFactors.teamFirst}.mp4`;
+            // Build the video filename based on old CB naming convention
+            const videoFilename = `${experimentMode === 'group' ? 'CD_group' : 'CD_pref'}_${selectedCB}.mp4`;
             
             // Set video source
             video.querySelector('source').src = `${VIDEO_PATH}/${videoFilename}`;
             
             // Log the experiment setup for easy reading
             const experimentSetup = {
+                mode: experimentMode,
+                version: experimentVersion,
                 condition: selectedCondition,
                 counterbalance: selectedCB,
-                factors: experimentFactors,
                 videoFile: videoFilename,
-                videoPath: `${VIDEO_PATH}/${videoFilename}`
+                overlayImagePath: `${IMG_PATH}/${selectedCondition}/${selectedCondition}_CB${selectedCB}_slide_*.png`
             };
             
             console.log("EXPERIMENT SETUP:", experimentSetup);
@@ -393,9 +303,9 @@
                             video.pause();
                             break;
                         case 'setCondition':
-                            if (event.data.condition && event.data.cb) {
+                            if (event.data.version && event.data.cb) {
                                 window.location.href = window.location.pathname + 
-                                    '?condition=' + event.data.condition +
+                                    '?version=' + event.data.version +
                                     '&cb=' + event.data.cb +
                                     '&autoAdvance=' + autoAdvance +
                                     (debugMode ? '&debug=true' : '');
