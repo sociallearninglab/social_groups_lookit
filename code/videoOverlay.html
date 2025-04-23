@@ -45,10 +45,10 @@
         
         .overlay-image {
             position: absolute;
-            top: 35pt;
-            left: 2pt;
+            top: 0pt;
+            left: 0pt;
             width: 100%;
-            height: 44.5%;
+            height: 48%;
             object-fit: contain;
             display: none;
         }
@@ -120,7 +120,7 @@
             // Base paths - using relative paths for web compatibility
             const BASE_PATH = "";  // Empty for relative paths
             const VIDEO_PATH = `${BASE_PATH}/mp4`;
-            const IMG_PATH = `${BASE_PATH}/img/processed/retained_images`;
+            const IMG_PATH = `${BASE_PATH}/img/processed/three_factor_images`;
             
             // Get URL parameters
             const urlParams = new URLSearchParams(window.location.search);
@@ -136,6 +136,29 @@
             // Define available counterbalances for each mode
             const groupCounterbalances = ['01', '02', '05', '06', '09', '10', '13', '14']; 
             const prefCounterbalances = ['01', '03', '05', '07', '09', '11', '13', '15'];
+            
+            // Mapping of counterbalance numbers to factor meanings
+            const groupCBMeanings = {
+                '01': 'Kiki_Red_Kiki_Red',    // [PredictedFruit]_[PredictedTeam]_[FruitLeft]_[TeamFirst]
+                '02': 'Kiki_Blue_Kiki_Red',
+                '05': 'Kiki_Red_Kiki_Blue',
+                '06': 'Kiki_Blue_Kiki_Blue',
+                '09': 'Kiki_Red_Bubba_Red',
+                '10': 'Kiki_Blue_Bubba_Red',
+                '13': 'Kiki_Red_Bubba_Blue',
+                '14': 'Kiki_Blue_Bubba_Blue'
+            };
+
+            const prefCBMeanings = {
+                '01': 'Kiki_Red_Kiki_Red',    // [PredictedFruit]_[PredictedTeam]_[FruitLeft]_[TeamFirst]
+                '03': 'Bubba_Red_Kiki_Red',
+                '05': 'Kiki_Red_Kiki_Blue',
+                '07': 'Bubba_Red_Kiki_Blue',
+                '09': 'Kiki_Red_Bubba_Red',
+                '11': 'Bubba_Red_Bubba_Red',
+                '13': 'Kiki_Red_Bubba_Blue',
+                '15': 'Bubba_Red_Bubba_Blue'
+            };
             
             // Define overlay image timings (in seconds)
             const overlayTimings = [
@@ -160,10 +183,23 @@
                 (fixedVersion.includes('group') ? 'group' : 'pref') : 
                 getRandomElement(experimentModes);
             
+            // Log step 1
+            console.log(`STEP 1: Randomly assigned experiment mode: ${experimentMode}`);
+            
             // Step 2: Randomly select one of the 8 counterbalances for this mode
             let selectedCB = fixedCB || (experimentMode === 'group' ? 
                 getRandomElement(groupCounterbalances) : 
                 getRandomElement(prefCounterbalances));
+            
+            // Log step 2
+            console.log(`STEP 2: Randomly selected counterbalance: CB${selectedCB}`);
+            
+            // Get the factor meaning for the selected CB
+            let cbMeaning = experimentMode === 'group' ? 
+                groupCBMeanings[selectedCB] : 
+                prefCBMeanings[selectedCB];
+            
+            console.log(`Counterbalance ${selectedCB} factors: ${cbMeaning}`);
             
             // Step 3: Randomly select which version (CD, Cx, xD)
             let experimentVersion = fixedVersion ? 
@@ -171,14 +207,29 @@
                  fixedVersion.includes('Cx') ? 'Cx' : 'xD') : 
                 getRandomElement(experimentVersions);
             
+            // Log step 3
+            console.log(`STEP 3: Randomly selected experiment version: ${experimentVersion}`);
+            
             // Construct the full condition string (e.g., "group_CD")
             let selectedCondition = `${experimentMode}_${experimentVersion}`;
             
             // Build the video filename based on old CB naming convention
-            const videoFilename = `${experimentMode === 'group' ? 'CD_group_CB' : 'CD_pref_CB'}${selectedCB}.mp4`;
+            const videoFilename = `CD_${experimentMode}_CB${selectedCB}.mp4`;
             
             // Set video source
-            video.querySelector('source').src = `${VIDEO_PATH}/${videoFilename}`;
+            const videoSrc = `${VIDEO_PATH}/${videoFilename}`;
+            video.querySelector('source').src = videoSrc;
+            
+            // Log the selected video
+            console.log(`Selected video: ${videoSrc}`);
+            
+            // Parse the factors from the counterbalance info
+            let factors = {
+                predictedFruit: cbMeaning.split('_')[0],
+                predictedTeam: cbMeaning.split('_')[1],
+                fruitLeft: cbMeaning.split('_')[2],
+                teamFirst: cbMeaning.split('_')[3]
+            };
             
             // Log the experiment setup for easy reading
             const experimentSetup = {
@@ -186,20 +237,18 @@
                 version: experimentVersion,
                 condition: selectedCondition,
                 counterbalance: selectedCB,
+                factors: factors,
                 videoFile: videoFilename,
-                overlayImagePath: `${IMG_PATH}/${selectedCondition}/${selectedCondition}_CB${selectedCB}_slide_*.png`
+                videoPath: videoSrc
             };
             
-            console.log("EXPERIMENT SETUP:", experimentSetup);
-            
-            // In debug mode, show the setup on screen
-            if (debugMode) {
-                statusMessage.style.display = 'block';
-                statusMessage.textContent = JSON.stringify(experimentSetup, null, 2);
-            }
+            console.log("EXPERIMENT SETUP SUMMARY:", experimentSetup);
             
             // Create overlay config based on selected condition and CB
             let overlayConfig = [];
+            
+            // Log overlay image info
+            console.log("Overlay Images:");
             
             // Create overlay config for each image timing
             overlayTimings.forEach(timing => {
@@ -211,7 +260,15 @@
                     startTime: timing.startTime,
                     endTime: timing.endTime
                 });
+                
+                console.log(`  - Slide ${slideNum}: ${imgPath} (${timing.startTime}s to ${timing.endTime}s)`);
             });
+            
+            // In debug mode, show the setup on screen
+            if (debugMode) {
+                statusMessage.style.display = 'block';
+                statusMessage.textContent = JSON.stringify(experimentSetup, null, 2);
+            }
             
             // Load the video
             video.load();
@@ -219,6 +276,7 @@
             // Set current time to 0 to show first frame
             video.addEventListener('loadedmetadata', function() {
                 video.currentTime = 0;
+                console.log("Video metadata loaded, ready to play");
             });
             
             // Create all the overlay images
@@ -242,8 +300,14 @@
                 overlayConfig.forEach((config, index) => {
                     const overlay = document.getElementById(`overlay-${index}`);
                     if (currentTime >= config.startTime && currentTime < config.endTime) {
+                        if (overlay.style.display === 'none') {
+                            console.log(`Showing overlay: ${config.imageSrc} at ${currentTime.toFixed(1)}s`);
+                        }
                         overlay.style.display = 'block';
                     } else {
+                        if (overlay.style.display === 'block') {
+                            console.log(`Hiding overlay: ${config.imageSrc} at ${currentTime.toFixed(1)}s`);
+                        }
                         overlay.style.display = 'none';
                     }
                 });
@@ -263,9 +327,11 @@
             
             // Start playing when clicked
             initialPlayButton.addEventListener('click', function() {
+                console.log("Initial play button clicked");
                 // Try to play the video
                 video.play()
                     .then(() => {
+                        console.log("Video playback started successfully");
                         updateOverlays();
                         initialPlayButton.style.display = 'none';
                         
@@ -280,7 +346,9 @@
             
             // When video ends
             video.addEventListener('ended', function() {
+                console.log("Video playback ended");
                 if (autoAdvance) {
+                    console.log("Auto-advancing to next frame");
                     // Tell lookit to move to next frame
                     window.parent.postMessage({
                         type: 'nextFrame'
@@ -288,11 +356,21 @@
                 }
             });
             
+            // When playback time updates
+            video.addEventListener('timeupdate', function() {
+                if (Math.floor(video.currentTime) % 10 === 0) {
+                    // Log every 10 seconds to avoid console spam
+                    console.log(`Video playback at ${video.currentTime.toFixed(1)}s`);
+                }
+            });
+            
             // Message handler for lookit
             window.addEventListener('message', function(event) {
                 if (event.data && event.data.type) {
+                    console.log(`Received message: ${event.data.type}`);
                     switch (event.data.type) {
                         case 'play':
+                            console.log("Play command received");
                             video.play()
                                 .then(() => {
                                     updateOverlays();
@@ -300,9 +378,11 @@
                                 .catch(e => console.error('Video play failed:', e));
                             break;
                         case 'pause':
+                            console.log("Pause command received");
                             video.pause();
                             break;
                         case 'setCondition':
+                            console.log(`SetCondition command received: ${event.data.version}, ${event.data.cb}`);
                             if (event.data.version && event.data.cb) {
                                 window.location.href = window.location.pathname + 
                                     '?version=' + event.data.version +
@@ -314,6 +394,9 @@
                     }
                 }
             });
+            
+            // Log that initialization is complete
+            console.log("Gazorp Experiment Video Player initialized successfully");
         });
     </script>
 </body>
