@@ -175,7 +175,7 @@
             let selectedCondition = `${experimentMode}_${experimentVersion}`;
             
             // Build the video filename based on old CB naming convention
-            const videoFilename = `${experimentMode === 'group' ? 'CD_group' : 'CD_pref'}_${selectedCB}.mp4`;
+            const videoFilename = `${experimentMode === 'group' ? 'CD_group_CB' : 'CD_pref_CB'}${selectedCB}.mp4`;
             
             // Set video source
             video.querySelector('source').src = `${VIDEO_PATH}/${videoFilename}`;
