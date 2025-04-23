@@ -117,8 +117,8 @@
             const initialPlayButton = document.getElementById('initialPlayButton');
             const statusMessage = document.getElementById('statusMessage');
             
-            // Base paths - using relative paths for web compatibility
-            const BASE_PATH = "";  // Empty for relative paths
+            // Base paths
+            const BASE_PATH = "/Users/mokeeffe/Documents/GitHub/social_groups_lookit";
             const VIDEO_PATH = `${BASE_PATH}/mp4`;
             const IMG_PATH = `${BASE_PATH}/img/processed/three_factor_images`;
             
@@ -276,8 +276,7 @@
                 condition: selectedCondition,
                 counterbalance: selectedCB,
                 factors: experimentFactors,
-                videoFile: videoFilename,
-                videoPath: `${VIDEO_PATH}/${videoFilename}`
+                videoFile: videoFilename
             };
             
             console.log("EXPERIMENT SETUP:", experimentSetup);
@@ -318,9 +317,6 @@
                 overlay.className = 'overlay-image';
                 overlay.id = `overlay-${index}`;
                 overlay.style.display = 'none';
-                overlay.onerror = function() {
-                    console.warn(`Image not found: ${config.imageSrc}`);
-                };
                 playerContainer.appendChild(overlay);
             });
             
@@ -344,13 +340,6 @@
                 }
             }
             
-            // Handle video error
-            video.addEventListener('error', function() {
-                console.error('Video error:', video.error);
-                statusMessage.style.display = 'block';
-                statusMessage.textContent = `Error loading video: ${videoFilename}. Check console for details.`;
-            });
-            
             // Start playing when clicked
             initialPlayButton.addEventListener('click', function() {
                 // Try to play the video
@@ -363,8 +352,6 @@
                     })
                     .catch(error => {
                         console.error('Video play failed:', error);
-                        statusMessage.style.display = 'block';
-                        statusMessage.textContent = 'Failed to play video. Check console for details.';
                     });
             });
             
