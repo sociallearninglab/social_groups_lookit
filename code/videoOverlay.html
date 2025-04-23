@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Overlay Player</title>
+    <title>Gazorp Experiment Video Player</title>
     <style>
         html, body, iframe {
             margin: 0 !important;
@@ -54,6 +54,16 @@
         }
         
         #statusMessage {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 100;
+            font-family: monospace;
+            font-size: 12px;
             display: none;
         }
         
@@ -94,68 +104,213 @@
             Your browser does not support the audio element.
         </audio>
         
+        <div id="statusMessage"></div>
         <button id="initialPlayButton">Start Story</button>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // grab all the elements
+            // Grab all the elements
             const playerContainer = document.getElementById('playerContainer');
             const video = document.getElementById('videoElement');
             const audio = document.getElementById('backgroundAudio');
             const initialPlayButton = document.getElementById('initialPlayButton');
+            const statusMessage = document.getElementById('statusMessage');
             
-            // get stuff from the URL
+            // Base paths
+            const BASE_PATH = "/Users/mokeeffe/Documents/GitHub/social_groups_lookit";
+            const VIDEO_PATH = `${BASE_PATH}/mp4`;
+            const IMG_PATH = `${BASE_PATH}/img/processed/three_factor_images`;
+            
+            // Get URL parameters
             const urlParams = new URLSearchParams(window.location.search);
-            const videoId = urlParams.get('videoId') || 'in4_out2_CB01_slow';
-            const audioId = urlParams.get('audioId') || 'song';
+            const debugMode = urlParams.get('debug') === 'true';
+            const fixedCondition = urlParams.get('condition');
+            const fixedCB = urlParams.get('cb');
             const autoAdvance = urlParams.get('autoAdvance') === 'true';
-            const baseUrl = urlParams.get('baseUrl') || 'https://sociallearninglab.github.io/social_groups_lookit';
             
-            // set up the video source
-            const videoSrc = baseUrl + videoId + '.mp4';
-            video.querySelector('source').src = videoSrc;
+            // Define experiment conditions
+            const conditions = ['group_CD', 'group_Cx', 'group_xD', 'pref_CD', 'pref_Cx', 'pref_xD'];
             
-            // set up the audio source
-            const audioSrc = baseUrl + audioId + '.mp3';
-            audio.querySelector('source').src = audioSrc;
+            // Define counterbalances to keep for each condition type
+            const groupCounterbalances = ['01', '02', '05', '06', '09', '10', '13', '14']; // For group conditions
+            const prefCounterbalances = ['01', '03', '05', '07', '09', '11', '13', '15']; // For pref conditions
             
-            // load the media
+            // Define overlay image timings (in seconds)
+            const overlayTimings = [
+                { slide: '6', startTime: 118.5, endTime: 144 },
+                { slide: '9', startTime: 144, endTime: 167 },
+                { slide: '11', startTime: 167, endTime: 192 },
+                { slide: '13', startTime: 192, endTime: 220 },
+                { slide: '15', startTime: 220, endTime: 256 },
+                { slide: '18', startTime: 256, endTime: 279 },
+                { slide: '20', startTime: 279, endTime: 300 },
+                { slide: '22', startTime: 300, endTime: 320 },
+                { slide: '24', startTime: 320, endTime: 340 }
+            ];
+            
+            // Function to choose a random element from an array
+            function getRandomElement(array) {
+                return array[Math.floor(Math.random() * array.length)];
+            }
+            
+            // Randomly assign condition and counterbalance
+            let selectedCondition = fixedCondition || getRandomElement(conditions);
+            let isGroupCondition = selectedCondition.startsWith('group');
+            
+            // Select counterbalance based on condition type
+            let selectedCB = fixedCB || (isGroupCondition ? 
+                getRandomElement(groupCounterbalances) : 
+                getRandomElement(prefCounterbalances));
+            
+            // Parse the condition and CB to get the factors
+            function getFactorsFromCB(condition, cb) {
+                // For reference, the key order is:
+                // 1) Which fruit is the predicted response (kiki/bubba)
+                // 2) Which team is the predicted response (red/blue)
+                // 3) Which fruit is on the left (kiki/bubba)
+                // 4) Which team was presented first (red/blue)
+                
+                let factors = {
+                    predictedFruit: null,
+                    predictedTeam: null,
+                    fruitLeft: null,
+                    teamFirst: null
+                };
+                
+                // Set factors based on known counterbalances
+                // Group conditions (gazorp always likes kiki)
+                if (condition.startsWith('group')) {
+                    factors.predictedFruit = 'Kiki'; // Always kiki for group conditions
+                    
+                    // Map CB to factors based on the key you provided
+                    if (cb === '01') {
+                        factors.predictedTeam = 'Red';
+                        factors.fruitLeft = 'Kiki';
+                        factors.teamFirst = 'Red';
+                    } else if (cb === '02') {
+                        factors.predictedTeam = 'Blue';
+                        factors.fruitLeft = 'Kiki';
+                        factors.teamFirst = 'Red';
+                    } else if (cb === '05') {
+                        factors.predictedTeam = 'Red';
+                        factors.fruitLeft = 'Kiki';
+                        factors.teamFirst = 'Blue';
+                    } else if (cb === '06') {
+                        factors.predictedTeam = 'Blue';
+                        factors.fruitLeft = 'Kiki';
+                        factors.teamFirst = 'Blue';
+                    } else if (cb === '09') {
+                        factors.predictedTeam = 'Red';
+                        factors.fruitLeft = 'Bubba';
+                        factors.teamFirst = 'Red';
+                    } else if (cb === '10') {
+                        factors.predictedTeam = 'Blue';
+                        factors.fruitLeft = 'Bubba';
+                        factors.teamFirst = 'Red';
+                    } else if (cb === '13') {
+                        factors.predictedTeam = 'Red';
+                        factors.fruitLeft = 'Bubba';
+                        factors.teamFirst = 'Blue';
+                    } else if (cb === '14') {
+                        factors.predictedTeam = 'Blue';
+                        factors.fruitLeft = 'Bubba';
+                        factors.teamFirst = 'Blue';
+                    }
+                } 
+                // Preference conditions (always asking about red gazorp)
+                else if (condition.startsWith('pref')) {
+                    factors.predictedTeam = 'Red'; // Always red for pref conditions
+                    
+                    if (cb === '01') {
+                        factors.predictedFruit = 'Kiki';
+                        factors.fruitLeft = 'Kiki';
+                        factors.teamFirst = 'Red';
+                    } else if (cb === '03') {
+                        factors.predictedFruit = 'Bubba';
+                        factors.fruitLeft = 'Kiki';
+                        factors.teamFirst = 'Red';
+                    } else if (cb === '05') {
+                        factors.predictedFruit = 'Kiki';
+                        factors.fruitLeft = 'Kiki';
+                        factors.teamFirst = 'Blue';
+                    } else if (cb === '07') {
+                        factors.predictedFruit = 'Bubba';
+                        factors.fruitLeft = 'Kiki';
+                        factors.teamFirst = 'Blue';
+                    } else if (cb === '09') {
+                        factors.predictedFruit = 'Kiki';
+                        factors.fruitLeft = 'Bubba';
+                        factors.teamFirst = 'Red';
+                    } else if (cb === '11') {
+                        factors.predictedFruit = 'Bubba';
+                        factors.fruitLeft = 'Bubba';
+                        factors.teamFirst = 'Red';
+                    } else if (cb === '13') {
+                        factors.predictedFruit = 'Kiki';
+                        factors.fruitLeft = 'Bubba';
+                        factors.teamFirst = 'Blue';
+                    } else if (cb === '15') {
+                        factors.predictedFruit = 'Bubba';
+                        factors.fruitLeft = 'Bubba';
+                        factors.teamFirst = 'Blue';
+                    }
+                }
+                
+                return factors;
+            }
+            
+            // Get the factors for the selected condition and CB
+            const experimentFactors = getFactorsFromCB(selectedCondition, selectedCB);
+            
+            // Build the video filename based on factors
+            const videoFilename = isGroupCondition ?
+                `group_${experimentFactors.predictedFruit}_${experimentFactors.predictedTeam}_${experimentFactors.fruitLeft}_${experimentFactors.teamFirst}.mp4` :
+                `pref_${experimentFactors.predictedFruit}_${experimentFactors.predictedTeam}_${experimentFactors.fruitLeft}_${experimentFactors.teamFirst}.mp4`;
+            
+            // Set video source
+            video.querySelector('source').src = `${VIDEO_PATH}/${videoFilename}`;
+            
+            // Log the experiment setup for easy reading
+            const experimentSetup = {
+                condition: selectedCondition,
+                counterbalance: selectedCB,
+                factors: experimentFactors,
+                videoFile: videoFilename
+            };
+            
+            console.log("EXPERIMENT SETUP:", experimentSetup);
+            
+            // In debug mode, show the setup on screen
+            if (debugMode) {
+                statusMessage.style.display = 'block';
+                statusMessage.textContent = JSON.stringify(experimentSetup, null, 2);
+            }
+            
+            // Create overlay config based on selected condition and CB
+            let overlayConfig = [];
+            
+            // Create overlay config for each image timing
+            overlayTimings.forEach(timing => {
+                const slideNum = timing.slide;
+                const imgPath = `${IMG_PATH}/${selectedCondition}/${selectedCondition}_CB${selectedCB}_slide_${slideNum}.png`;
+                
+                overlayConfig.push({
+                    imageSrc: imgPath,
+                    startTime: timing.startTime,
+                    endTime: timing.endTime
+                });
+            });
+            
+            // Load the video
             video.load();
-            audio.load();
             
-            // set current time to 0 to show first frame
+            // Set current time to 0 to show first frame
             video.addEventListener('loadedmetadata', function() {
                 video.currentTime = 0;
             });
             
-            // list of overlays and when to show them
-            let overlayConfig = [];
-            
-            // set up our test video timings
-            if (videoId === 'in4_out2_CB01_slow') {
-                overlayConfig = [
-                    { imageSrc: baseUrl + 'slide_16.png', startTime: 118.5, endTime: 144 },
-                    { imageSrc: baseUrl + 'slide_19.png', startTime: 144, endTime: 167 },
-                    { imageSrc: baseUrl + 'slide_21.png', startTime: 167, endTime: 192 },
-                    { imageSrc: baseUrl + 'slide_23.png', startTime: 192, endTime: 220 },
-                    { imageSrc: baseUrl + 'slide_25.png', startTime: 220, endTime: 256 },
-                    { imageSrc: baseUrl + 'slide_28.png', startTime: 256, endTime: 279 },
-                    { imageSrc: baseUrl + 'slide_30.png', startTime: 279, endTime: 320 }
-                ];
-            } else {
-                // try to get overlay config from URL
-                const configParam = urlParams.get('overlayConfig');
-                if (configParam) {
-                    try {
-                        overlayConfig = JSON.parse(decodeURIComponent(configParam));
-                    } catch (e) {
-                        console.error('Error parsing overlay config:', e);
-                    }
-                }
-            }
-            
-            // create all the overlay images
+            // Create all the overlay images
             overlayConfig.forEach((config, index) => {
                 const overlay = document.createElement('img');
                 overlay.src = config.imageSrc;
@@ -165,11 +320,11 @@
                 playerContainer.appendChild(overlay);
             });
             
-            // show/hide overlays based on video time
+            // Show/hide overlays based on video time
             function updateOverlays() {
                 const currentTime = video.currentTime;
                 
-                // check each overlay to see if it should be visible
+                // Check each overlay to see if it should be visible
                 overlayConfig.forEach((config, index) => {
                     const overlay = document.getElementById(`overlay-${index}`);
                     if (currentTime >= config.startTime && currentTime < config.endTime) {
@@ -179,54 +334,35 @@
                     }
                 });
                 
-                // keep updating while video plays
+                // Keep updating while video plays
                 if (!video.paused) {
                     requestAnimationFrame(updateOverlays);
                 }
             }
             
-            // start playing when clicked
+            // Start playing when clicked
             initialPlayButton.addEventListener('click', function() {
-                // First try to play the video
+                // Try to play the video
                 video.play()
                     .then(() => {
                         updateOverlays();
                         initialPlayButton.style.display = 'none';
                         
-                        // After video starts, start the audio
-                        audio.play()
-                            .then(() => {
-                                console.log('Audio playing successfully');
-                            })
-                            .catch(error => {
-                                console.error('Audio play failed:', error);
-                            });
+                        // Handle audio later as mentioned
                     })
                     .catch(error => {
                         console.error('Video play failed:', error);
                     });
             });
             
-            // When video ends, stop the audio too
+            // When video ends
             video.addEventListener('ended', function() {
-                audio.pause();
-                audio.currentTime = 0;
-                
                 if (autoAdvance) {
-                    // tell lookit to move to next frame
+                    // Tell lookit to move to next frame
                     window.parent.postMessage({
                         type: 'nextFrame'
                     }, '*');
                 }
-            });
-            
-            // Sync audio with video if either gets paused
-            video.addEventListener('pause', function() {
-                audio.pause();
-            });
-            
-            video.addEventListener('play', function() {
-                audio.play().catch(e => console.error('Audio resume failed:', e));
             });
             
             // Message handler for lookit
@@ -237,22 +373,19 @@
                             video.play()
                                 .then(() => {
                                     updateOverlays();
-                                    audio.play().catch(e => console.error('Audio play failed:', e));
                                 })
                                 .catch(e => console.error('Video play failed:', e));
                             break;
                         case 'pause':
                             video.pause();
-                            audio.pause();
                             break;
-                        case 'setVideo':
-                            if (event.data.videoId) {
-                                const newAudioId = event.data.audioId || audioId;
-                                window.location.href = window.location.pathname + '?videoId=' + 
-                                    event.data.videoId +
-                                    '&audioId=' + newAudioId +
+                        case 'setCondition':
+                            if (event.data.condition && event.data.cb) {
+                                window.location.href = window.location.pathname + 
+                                    '?condition=' + event.data.condition +
+                                    '&cb=' + event.data.cb +
                                     '&autoAdvance=' + autoAdvance +
-                                    '&baseUrl=' + encodeURIComponent(baseUrl);
+                                    (debugMode ? '&debug=true' : '');
                             }
                             break;
                     }
