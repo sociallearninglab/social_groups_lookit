@@ -67,7 +67,7 @@
     <script>
         // Main configuration
         const baseUrl = ''; // Base URL for resources, empty for relative paths
-        const videoPath = `${baseUrl}/mp4/${versionType}_${taskType}`;
+        const videoPath = `${baseUrl}/mp4`;
         const audioPath = `${baseUrl}/mp3`;
         
         // Debug mode flag
@@ -174,9 +174,9 @@
             // Get factors for this counterbalance
             factors = cbFactors[taskType][currentCB];
             
-            // Set video source - always use CD version for videos
-            // Use the correct video filename format: CD_[taskType]_CB[cb].mp4
-            const videoFileName = `CD_${taskType}_CB${currentCB}.mp4`;
+            // Set video source using the updated path structure with the correct version type
+            // Now using: /mp4/[versionType]_[taskType]/[versionType]_[taskType]_CB[cb].mp4
+            const videoFileName = `${versionType}_${taskType}/${versionType}_${taskType}_CB${currentCB}.mp4`;
             videoElement.src = `${videoPath}/${videoFileName}`;
             
             // Build the customized audio script for this condition
@@ -581,7 +581,7 @@
                 console.log(`[Gazorp] ${message}`);
             }
         }
-
+        
         // Start initialization when document is ready
         document.addEventListener('DOMContentLoaded', initExperiment);
     </script>
