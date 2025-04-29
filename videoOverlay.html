@@ -3,395 +3,586 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gazorp Experiment Video Player</title>
+    <title>Gazorp Experiment Player</title>
     <style>
-        html, body, iframe {
-            margin: 0 !important;
-            padding: 0 !important;
-            border: none !important;
-            overflow: hidden !important;
-        }
-        
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            border: none;
-        }
-        
         body {
             margin: 0;
             padding: 0;
-            background-color: #fff;
             overflow: hidden;
-            border: none;
+            background-color: #000;
         }
-        
         .player-container {
             position: relative;
             width: 100vw;
             height: 100vh;
-            overflow: hidden;
-            border: none;
-            background-color: #fff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
-        
         #videoElement {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            display: block;
+            max-width: 100%;
+            max-height: 100%;
         }
-        
-        .overlay-image {
-            position: absolute;
-            top: 0;
+        .debug-panel {
+            position: fixed;
+            bottom: 0;
             left: 0;
-            width: 100%;
-            height: 44.5%;
-            object-fit: contain;
-            display: none;
-        }
-        
-        #statusMessage {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background-color: rgba(0, 0, 0, 0.7);
+            background: rgba(0,0,0,0.7);
             color: white;
             padding: 10px;
-            border-radius: 5px;
-            z-index: 100;
             font-family: monospace;
             font-size: 12px;
+            max-width: 300px;
+            max-height: 200px;
+            overflow-y: auto;
             display: none;
         }
-        
-        #nextButton {
-            display: none;
-        }
-        
-        #initialPlayButton {
+        #startButton {
             position: absolute;
-            top: 70%;
+            top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            padding: 20px 40px;
-            font-size: 20px;
-            background-color: rgba(0, 0, 0, 0.7);
+            padding: 15px 30px;
+            font-size: 18px;
+            background-color: #4CAF50;
             color: white;
-            border: 2px solid white;
-            border-radius: 8px;
+            border: none;
+            border-radius: 5px;
             cursor: pointer;
-            z-index: 200;
-        }
-        
-        #initialPlayButton:hover {
-            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 100;
         }
     </style>
 </head>
 <body>
-    <div class="player-container" id="playerContainer">
-        <video id="videoElement" playsinline preload="auto">
+    <div class="player-container">
+        <video id="videoElement" playsinline>
             <source src="" type="video/mp4">
-            Your browser does not support the video tag.
         </video>
-        
-        <!-- Hidden audio element for background music -->
-        <audio id="backgroundAudio" preload="auto">
-            <source src="" type="audio/mpeg">
-            Your browser does not support the audio element.
-        </audio>
-        
-        <div id="statusMessage"></div>
-        <button id="initialPlayButton">Start Story</button>
+        <button id="startButton">Start Experiment</button>
     </div>
+    
+    <div id="debugPanel" class="debug-panel"></div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Grab all the elements
-            const playerContainer = document.getElementById('playerContainer');
-            const video = document.getElementById('videoElement');
-            const audio = document.getElementById('backgroundAudio');
-            const initialPlayButton = document.getElementById('initialPlayButton');
-            const statusMessage = document.getElementById('statusMessage');
+        // Main configuration
+        const baseUrl = ''; // Base URL for resources, empty for relative paths
+        const videoPath = `${baseUrl}/mp4`;
+        const audioPath = `${baseUrl}/mp3`;
+        
+        // Debug mode flag
+        const debugMode = new URLSearchParams(window.location.search).get('debug') === 'true';
+        
+        // Elements
+        const videoElement = document.getElementById('videoElement');
+        const startButton = document.getElementById('startButton');
+        const debugPanel = document.getElementById('debugPanel');
+        
+        // If debug mode, show debug panel
+        if (debugMode) {
+            debugPanel.style.display = 'block';
+        }
+        
+        // Audio elements cache
+        const audioElements = {};
+        
+        // Experiment configuration
+        const experimentVersions = ['group_CD', 'group_Cx', 'group_xD', 'pref_CD', 'pref_Cx', 'pref_xD'];
+        const groupCounterbalances = ['01', '02', '05', '06', '09', '10', '13', '14'];
+        const prefCounterbalances = ['01', '03', '05', '07', '09', '11', '13', '15'];
+        
+        // Experiment state
+        let currentVersion;
+        let currentCB;
+        let isGroupTask;
+        let factors;
+        let currentAudioQueue = [];
+        let freezePoints = [];
+        let currentFreezeIndex = 0;
+        let isVideoFrozen = false;
+        let isFreezeScheduled = false;
+        let currentScheduledTimeout = null;
+        
+        // Default audio script template - this will be customized based on counterbalance factors
+        const audioScriptTemplate = {
+            // Base script shared by all versions
+            base: [
+                // Slide 1: Introduction
+                { time: 0, audio: "intro_gazoom", freeze_start: 4, freeze_end: 12.6 },
+                
+                // Slide 2: Team Introduction
+                { time: 12.6, audio: "intro_gazorps", freeze_start: 13, freeze_end: 24 },
+                
+                // Slide 3: Team Questions will be dynamically assigned
+                
+                // Slide 4: Fruit Introduction
+                { time: 62, audio: "fruits_intro", freeze_start: 62, freeze_end: 72 },
+                
+                // Slide 5: Fruit Questions will be dynamically assigned
+                
+                // Slide 6: Snack Time Introduction
+                { time: 107, audio: "intro_snacktime", freeze_start: 107, freeze_end: 123 },
+                
+                // Slide 7: Song Introduction
+                { time: 123, audio: "song_intro", freeze_start: null, freeze_end: 136 }
+                
+                // Remaining slides will be added dynamically based on factors
+            ]
+        };
+        
+        // Counterbalance factor mappings
+        const cbFactors = {
+            group: {
+                '01': { predicted_fruit: 'Kiki', predicted_team: 'Red', fruit_left: 'Kiki', team_first: 'Red' },
+                '02': { predicted_fruit: 'Kiki', predicted_team: 'Blue', fruit_left: 'Kiki', team_first: 'Red' },
+                '05': { predicted_fruit: 'Kiki', predicted_team: 'Red', fruit_left: 'Kiki', team_first: 'Blue' },
+                '06': { predicted_fruit: 'Kiki', predicted_team: 'Blue', fruit_left: 'Kiki', team_first: 'Blue' },
+                '09': { predicted_fruit: 'Kiki', predicted_team: 'Red', fruit_left: 'Bubba', team_first: 'Red' },
+                '10': { predicted_fruit: 'Kiki', predicted_team: 'Blue', fruit_left: 'Bubba', team_first: 'Red' },
+                '13': { predicted_fruit: 'Kiki', predicted_team: 'Red', fruit_left: 'Bubba', team_first: 'Blue' },
+                '14': { predicted_fruit: 'Kiki', predicted_team: 'Blue', fruit_left: 'Bubba', team_first: 'Blue' }
+            },
+            pref: {
+                '01': { predicted_fruit: 'Kiki', predicted_team: 'Red', fruit_left: 'Kiki', team_first: 'Red' },
+                '03': { predicted_fruit: 'Bubba', predicted_team: 'Red', fruit_left: 'Kiki', team_first: 'Red' },
+                '05': { predicted_fruit: 'Kiki', predicted_team: 'Red', fruit_left: 'Kiki', team_first: 'Blue' },
+                '07': { predicted_fruit: 'Bubba', predicted_team: 'Red', fruit_left: 'Kiki', team_first: 'Blue' },
+                '09': { predicted_fruit: 'Kiki', predicted_team: 'Red', fruit_left: 'Bubba', team_first: 'Red' },
+                '11': { predicted_fruit: 'Bubba', predicted_team: 'Red', fruit_left: 'Bubba', team_first: 'Red' },
+                '13': { predicted_fruit: 'Kiki', predicted_team: 'Red', fruit_left: 'Bubba', team_first: 'Blue' },
+                '15': { predicted_fruit: 'Bubba', predicted_team: 'Red', fruit_left: 'Bubba', team_first: 'Blue' }
+            }
+        };
+        
+        // Initialize experiment
+        function initExperiment() {
+            // Get experiment parameters from URL or randomly assign
+            const params = new URLSearchParams(window.location.search);
             
-            // Base paths
-            const BASE_PATH = "/Users/mokeeffe/Documents/GitHub/social_groups_lookit";
-            const VIDEO_PATH = `${BASE_PATH}/mp4`;
-            const IMG_PATH = `${BASE_PATH}/img/processed/three_factor_images`;
+            // Select version (group or pref + CD, Cx, or xD)
+            let taskType = params.get('task') || (Math.random() < 0.5 ? 'group' : 'pref');
+            let versionType = params.get('version') || ['CD', 'Cx', 'xD'][Math.floor(Math.random() * 3)];
+            currentVersion = `${taskType}_${versionType}`;
             
-            // Get URL parameters
-            const urlParams = new URLSearchParams(window.location.search);
-            const debugMode = urlParams.get('debug') === 'true';
-            const fixedCondition = urlParams.get('condition');
-            const fixedCB = urlParams.get('cb');
-            const autoAdvance = urlParams.get('autoAdvance') === 'true';
+            // Is this a group task?
+            isGroupTask = taskType === 'group';
             
-            // Define experiment conditions
-            const conditions = ['group_CD', 'group_Cx', 'group_xD', 'pref_CD', 'pref_Cx', 'pref_xD'];
+            // Select counterbalance
+            const validCBs = isGroupTask ? groupCounterbalances : prefCounterbalances;
+            currentCB = params.get('cb') || validCBs[Math.floor(Math.random() * validCBs.length)];
             
-            // Define counterbalances to keep for each condition type
-            const groupCounterbalances = ['01', '02', '05', '06', '09', '10', '13', '14']; // For group conditions
-            const prefCounterbalances = ['01', '03', '05', '07', '09', '11', '13', '15']; // For pref conditions
+            // Get factors for this counterbalance
+            factors = cbFactors[taskType][currentCB];
             
-            // Define overlay image timings (in seconds)
-            const overlayTimings = [
-                { slide: '6', startTime: 118.5, endTime: 144 },
-                { slide: '9', startTime: 144, endTime: 167 },
-                { slide: '11', startTime: 167, endTime: 192 },
-                { slide: '13', startTime: 192, endTime: 220 },
-                { slide: '15', startTime: 220, endTime: 256 },
-                { slide: '18', startTime: 256, endTime: 279 },
-                { slide: '20', startTime: 279, endTime: 300 },
-                { slide: '22', startTime: 300, endTime: 320 },
-                { slide: '24', startTime: 320, endTime: 340 }
-            ];
+            // Set video source - always use CD version for videos
+            const videoFileName = `CD_${taskType}_CB${currentCB}.mp4`;
+            videoElement.src = `${videoPath}/${videoFileName}`;
             
-            // Function to choose a random element from an array
-            function getRandomElement(array) {
-                return array[Math.floor(Math.random() * array.length)];
+            // Build the customized audio script for this condition
+            buildAudioScript();
+            
+            // Log experiment setup
+            logDebug(`Experiment setup: ${currentVersion}, CB${currentCB}`);
+            logDebug(`Factors: ${JSON.stringify(factors)}`);
+            logDebug(`Video: ${videoFileName}`);
+            
+            // Set up event listeners
+            setupEventListeners();
+            
+            // Load video
+            videoElement.load();
+        }
+        
+        function buildAudioScript() {
+            // Start with the base script
+            let script = [...audioScriptTemplate.base];
+            
+            // Add team introduction based on factors
+            if (factors.team_first === 'Red') {
+                script.push(
+                    { time: 21, audio: "red_team_first", freeze_start: null, freeze_end: null },
+                    { time: 25, audio: "blue_team_second", freeze_start: null, freeze_end: null }
+                );
+            } else {
+                script.push(
+                    { time: 21, audio: "blue_team_first", freeze_start: null, freeze_end: null },
+                    { time: 25, audio: "red_team_second", freeze_start: null, freeze_end: null }
+                );
             }
             
-            // Randomly assign condition and counterbalance
-            let selectedCondition = fixedCondition || getRandomElement(conditions);
-            let isGroupCondition = selectedCondition.startsWith('group');
+            // Add team questions based on which team is on the left (fruit_left determines this)
+            if (factors.fruit_left === 'Kiki') {
+                // Red team on left
+                script.push(
+                    { time: 29, audio: "question_point_red", freeze_start: 29, freeze_end: 34 },
+                    { time: 34, audio: "good_job", freeze_start: null, freeze_end: null },
+                    { time: 47, audio: "question_point_blue", freeze_start: 51, freeze_end: 56 },
+                    { time: 56, audio: "good_job", freeze_start: null, freeze_end: null }
+                );
+            } else {
+                // Blue team on left
+                script.push(
+                    { time: 29, audio: "question_point_blue", freeze_start: 29, freeze_end: 34 },
+                    { time: 34, audio: "good_job", freeze_start: null, freeze_end: null },
+                    { time: 47, audio: "question_point_red", freeze_start: 51, freeze_end: 56 },
+                    { time: 56, audio: "good_job", freeze_start: null, freeze_end: null }
+                );
+            }
             
-            // Select counterbalance based on condition type
-            let selectedCB = fixedCB || (isGroupCondition ? 
-                getRandomElement(groupCounterbalances) : 
-                getRandomElement(prefCounterbalances));
+            // Add fruit introduction based on which fruit is on the left
+            if (factors.fruit_left === 'Kiki') {
+                script.push(
+                    { time: 68, audio: "kiki_first", freeze_start: null, freeze_end: null },
+                    { time: 77, audio: "bubba_second", freeze_start: null, freeze_end: null }
+                );
+            } else {
+                script.push(
+                    { time: 68, audio: "bubba_first", freeze_start: null, freeze_end: null },
+                    { time: 77, audio: "kiki_second", freeze_start: null, freeze_end: null }
+                );
+            }
             
-            // Parse the condition and CB to get the factors
-            function getFactorsFromCB(condition, cb) {
-                // For reference, the key order is:
-                // 1) Which fruit is the predicted response (kiki/bubba)
-                // 2) Which team is the predicted response (red/blue)
-                // 3) Which fruit is on the left (kiki/bubba)
-                // 4) Which team was presented first (red/blue)
+            // Add fruit questions based on which fruit is on the left
+            if (factors.fruit_left === 'Kiki') {
+                script.push(
+                    { time: 80, audio: "question_point_kiki", freeze_start: 80, freeze_end: 89 },
+                    { time: 89, audio: "good_job", freeze_start: null, freeze_end: null },
+                    { time: 95, audio: "question_point_bubba", freeze_start: 95, freeze_end: 101 },
+                    { time: 101, audio: "good_job", freeze_start: null, freeze_end: null }
+                );
+            } else {
+                script.push(
+                    { time: 80, audio: "question_point_bubba", freeze_start: 80, freeze_end: 89 },
+                    { time: 89, audio: "good_job", freeze_start: null, freeze_end: null },
+                    { time: 95, audio: "question_point_kiki", freeze_start: 95, freeze_end: 101 },
+                    { time: 101, audio: "good_job", freeze_start: null, freeze_end: null }
+                );
+            }
+            
+            // Add Red Team sequence
+            script.push(
+                { time: 136, audio: "song_red_start", freeze_start: 138, freeze_end: 142 },
+                { time: 148, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 149, audio: "count_red_one", freeze_start: null, freeze_end: null },
+                { time: 152, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 159, audio: "song_red_start", freeze_start: null, freeze_end: null },
+                { time: 166, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 170, audio: "count_red_two", freeze_start: null, freeze_end: null },
+                { time: 173, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 176, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 182, audio: "song_red_start", freeze_start: null, freeze_end: null },
+                { time: 192, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 193, audio: "count_red_three", freeze_start: null, freeze_end: null },
+                { time: 196, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 199, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 201, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 208, audio: "song_red_start", freeze_start: null, freeze_end: null },
+                { time: 217, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 218, audio: "count_red_four", freeze_start: null, freeze_end: null },
+                { time: 222, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 224, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 227, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 229, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 236, audio: "summary_red", freeze_start: 236, freeze_end: 251 },
+                { time: 251, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 253, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 256, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 258, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 260, audio: "transition_blue", freeze_start: null, freeze_end: null }
+            );
+            
+            // Add Blue Team sequence
+            script.push(
+                { time: 265, audio: "song_blue_start", freeze_start: null, freeze_end: null },
+                { time: 274, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 275, audio: "count_blue_one", freeze_start: null, freeze_end: null },
+                { time: 279, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 285, audio: "song_blue_start", freeze_start: null, freeze_end: null },
+                { time: 294.5, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 296, audio: "count_blue_two", freeze_start: null, freeze_end: null },
+                { time: 300, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 301, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 308, audio: "song_blue_start", freeze_start: null, freeze_end: null },
+                { time: 318, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 319, audio: "count_blue_three", freeze_start: null, freeze_end: null },
+                { time: 323, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 324.5, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 327.5, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 333, audio: "song_blue_start", freeze_start: null, freeze_end: null },
+                { time: 343, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 345, audio: "count_blue_four", freeze_start: null, freeze_end: null },
+                { time: 348, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 350, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 353, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 355.5, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 357, audio: "summary_blue", freeze_start: 362, freeze_end: 372 },
+                { time: 372, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 375, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 377.5, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 380, audio: "bubba", freeze_start: null, freeze_end: null }
+            );
+            
+            // Add final review
+            script.push(
+                { time: 381, audio: "transition_all", freeze_start: 386, freeze_end: 401 },
+                { time: 397, audio: "review_red", freeze_start: null, freeze_end: 401 },
+                { time: 402, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 404, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 406.5, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 408.5, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 410, audio: "review_blue", freeze_start: 411, freeze_end: 415 },
+                { time: 414.5, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 417, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 419.5, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 422, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 423, audio: "great_job", freeze_start: null, freeze_end: null }
+            );
+            
+            // Add task-specific final test question sequence
+            if (isGroupTask) {
+                // Infer Group Task
+                script.push(
+                    { time: 430, audio: "test_new_gazorp", freeze_start: 431, freeze_end: 447 },
+                    { time: 435, audio: "test_lost_shirt", freeze_start: null, freeze_end: null },
+                    { time: 449, audio: "oh_wow", freeze_start: null, freeze_end: null },
+                    { time: 451, audio: factors.predicted_fruit === 'Kiki' ? "question_like_what_kiki" : "question_like_what_bubba", freeze_start: null, freeze_end: null },
+                    { time: 456, audio: "click_fruit", freeze_start: 456, freeze_end: 466 },
+                    { time: 461, audio: "right_likes", freeze_start: null, freeze_end: null },
+                    { time: 466, audio: factors.predicted_fruit === 'Kiki' ? "kiki" : "bubba", freeze_start: null, freeze_end: null },
+                    { time: 467, audio: "so_question", freeze_start: null, freeze_end: null },
+                    { time: 471, audio: factors.predicted_team === 'Red' ? "question_team_red" : "question_team_blue", freeze_start: null, freeze_end: null },
+                    { time: 472, audio: "why_team", freeze_start: null, freeze_end: null },
+                    { time: 473, audio: factors.predicted_team === 'Red' ? "red_team" : "blue_team", freeze_start: null, freeze_end: 480 },
+                    { time: 487, audio: "closing", freeze_start: null, freeze_end: null }
+                );
+            } else {
+                // Infer Preference Task
+                script.push(
+                    { time: 430, audio: "test_new_gazorp", freeze_start: 430, freeze_end: 487 },
+                    { time: 435, audio: "test_no_snack", freeze_start: null, freeze_end: null },
+                    { time: 443.5, audio: "question_team_red", freeze_start: null, freeze_end: null },
+                    { time: 449.5, audio: "click_team", freeze_start: null, freeze_end: 462 },
+                    { time: 462, audio: "click_team_correct", freeze_start: null, freeze_end: null },
+                    { time: 467, audio: "red_team", freeze_start: null, freeze_end: null },
+                    { time: 469, audio: "so_question", freeze_start: null, freeze_end: null },
+                    { time: 473, audio: factors.predicted_fruit === 'Kiki' ? "question_like_what_kiki" : "question_like_what_bubba", freeze_start: null, freeze_end: 483 },
+                    { time: 483, audio: "why_likes", freeze_start: null, freeze_end: null },
+                    { time: 487, audio: factors.predicted_fruit === 'Kiki' ? "kiki" : "bubba", freeze_start: null, freeze_end: 494 },
+                    { time: 494, audio: "closing", freeze_start: null, freeze_end: null }
+                );
+            }
+            
+            // Set the current audio queue
+            currentAudioQueue = [...script];
+            
+            // Extract freeze points
+            freezePoints = script
+                .filter(item => item.freeze_start !== null && item.freeze_end !== null)
+                .map(item => ({ start: item.freeze_start, end: item.freeze_end }));
+            
+            // Sort by time
+            currentAudioQueue.sort((a, b) => a.time - b.time);
+            freezePoints.sort((a, b) => a.start - b.start);
+            
+            logDebug(`Prepared ${currentAudioQueue.length} audio events and ${freezePoints.length} freeze points`);
+        }
+        
+        function setupEventListeners() {
+            // Video events
+            videoElement.addEventListener('loadedmetadata', onVideoLoaded);
+            videoElement.addEventListener('timeupdate', onTimeUpdate);
+            videoElement.addEventListener('ended', onVideoEnded);
+            
+            // Start button
+            startButton.addEventListener('click', startPlayback);
+            
+            // Message handlers for Lookit
+            window.addEventListener('message', onMessageReceived);
+        }
+        
+        function onVideoLoaded() {
+            logDebug('Video loaded, ready to play');
+            
+            // Create and preload all audio elements
+            preloadAudio();
+            
+            // Auto-start if specified in URL
+            if (new URLSearchParams(window.location.search).get('autostart') === 'true') {
+                startPlayback();
+            }
+        }
+        
+        function preloadAudio() {
+            // Create a Set of unique audio files needed
+            const uniqueAudio = new Set();
+            currentAudioQueue.forEach(item => uniqueAudio.add(item.audio));
+            
+            // Create audio elements for each file
+            uniqueAudio.forEach(audioFile => {
+                const audio = new Audio(`${audioPath}/${audioFile}.mp3`);
+                audio.preload = 'auto';
+                audioElements[audioFile] = audio;
+            });
+            
+            logDebug(`Preloaded ${uniqueAudio.size} audio files`);
+        }
+        
+        function startPlayback() {
+            // Hide start button
+            startButton.style.display = 'none';
+            
+            // Reset state
+            videoElement.currentTime = 0;
+            currentFreezeIndex = 0;
+            isVideoFrozen = false;
+            
+            // Reset all audio elements
+            Object.values(audioElements).forEach(audio => {
+                audio.pause();
+                audio.currentTime = 0;
+            });
+            
+            // Reset played flags on audio queue
+            currentAudioQueue.forEach(item => item.played = false);
+            
+            // Start playback
+            videoElement.play();
+            logDebug('Playback started');
+        }
+        
+        function onTimeUpdate() {
+            const currentTime = videoElement.currentTime;
+            
+            // Check for audio events
+            checkAudioEvents(currentTime);
+            
+            // Check for freeze points
+            checkFreezePoints(currentTime);
+        }
+        
+        function checkAudioEvents(currentTime) {
+            // Find audio events that should play
+            for (let i = 0; i < currentAudioQueue.length; i++) {
+                const event = currentAudioQueue[i];
                 
-                let factors = {
-                    predictedFruit: null,
-                    predictedTeam: null,
-                    fruitLeft: null,
-                    teamFirst: null
-                };
-                
-                // Set factors based on known counterbalances
-                // Group conditions (gazorp always likes kiki)
-                if (condition.startsWith('group')) {
-                    factors.predictedFruit = 'Kiki'; // Always kiki for group conditions
-                    
-                    // Map CB to factors based on the key you provided
-                    if (cb === '01') {
-                        factors.predictedTeam = 'Red';
-                        factors.fruitLeft = 'Kiki';
-                        factors.teamFirst = 'Red';
-                    } else if (cb === '02') {
-                        factors.predictedTeam = 'Blue';
-                        factors.fruitLeft = 'Kiki';
-                        factors.teamFirst = 'Red';
-                    } else if (cb === '05') {
-                        factors.predictedTeam = 'Red';
-                        factors.fruitLeft = 'Kiki';
-                        factors.teamFirst = 'Blue';
-                    } else if (cb === '06') {
-                        factors.predictedTeam = 'Blue';
-                        factors.fruitLeft = 'Kiki';
-                        factors.teamFirst = 'Blue';
-                    } else if (cb === '09') {
-                        factors.predictedTeam = 'Red';
-                        factors.fruitLeft = 'Bubba';
-                        factors.teamFirst = 'Red';
-                    } else if (cb === '10') {
-                        factors.predictedTeam = 'Blue';
-                        factors.fruitLeft = 'Bubba';
-                        factors.teamFirst = 'Red';
-                    } else if (cb === '13') {
-                        factors.predictedTeam = 'Red';
-                        factors.fruitLeft = 'Bubba';
-                        factors.teamFirst = 'Blue';
-                    } else if (cb === '14') {
-                        factors.predictedTeam = 'Blue';
-                        factors.fruitLeft = 'Bubba';
-                        factors.teamFirst = 'Blue';
-                    }
-                } 
-                // Preference conditions (always asking about red gazorp)
-                else if (condition.startsWith('pref')) {
-                    factors.predictedTeam = 'Red'; // Always red for pref conditions
-                    
-                    if (cb === '01') {
-                        factors.predictedFruit = 'Kiki';
-                        factors.fruitLeft = 'Kiki';
-                        factors.teamFirst = 'Red';
-                    } else if (cb === '03') {
-                        factors.predictedFruit = 'Bubba';
-                        factors.fruitLeft = 'Kiki';
-                        factors.teamFirst = 'Red';
-                    } else if (cb === '05') {
-                        factors.predictedFruit = 'Kiki';
-                        factors.fruitLeft = 'Kiki';
-                        factors.teamFirst = 'Blue';
-                    } else if (cb === '07') {
-                        factors.predictedFruit = 'Bubba';
-                        factors.fruitLeft = 'Kiki';
-                        factors.teamFirst = 'Blue';
-                    } else if (cb === '09') {
-                        factors.predictedFruit = 'Kiki';
-                        factors.fruitLeft = 'Bubba';
-                        factors.teamFirst = 'Red';
-                    } else if (cb === '11') {
-                        factors.predictedFruit = 'Bubba';
-                        factors.fruitLeft = 'Bubba';
-                        factors.teamFirst = 'Red';
-                    } else if (cb === '13') {
-                        factors.predictedFruit = 'Kiki';
-                        factors.fruitLeft = 'Bubba';
-                        factors.teamFirst = 'Blue';
-                    } else if (cb === '15') {
-                        factors.predictedFruit = 'Bubba';
-                        factors.fruitLeft = 'Bubba';
-                        factors.teamFirst = 'Blue';
-                    }
+                // If we're within 0.1 second of the event time and the audio hasn't played yet
+                if (Math.abs(currentTime - event.time) < 0.1 && !event.played) {
+                    playAudio(event.audio);
+                    event.played = true;
+                    logDebug(`Playing audio: ${event.audio} at ${currentTime.toFixed(2)}`);
                 }
-                
-                return factors;
             }
+        }
+        
+        function checkFreezePoints(currentTime) {
+            // Skip if we're already at the end of freeze points
+            if (currentFreezeIndex >= freezePoints.length) return;
             
-            // Get the factors for the selected condition and CB
-            const experimentFactors = getFactorsFromCB(selectedCondition, selectedCB);
+            const freezePoint = freezePoints[currentFreezeIndex];
             
-            // Build the video filename based on factors
-            const videoFilename = isGroupCondition ?
-                `group_${experimentFactors.predictedFruit}_${experimentFactors.predictedTeam}_${experimentFactors.fruitLeft}_${experimentFactors.teamFirst}.mp4` :
-                `pref_${experimentFactors.predictedFruit}_${experimentFactors.predictedTeam}_${experimentFactors.fruitLeft}_${experimentFactors.teamFirst}.mp4`;
-            
-            // Set video source
-            video.querySelector('source').src = `${VIDEO_PATH}/${videoFilename}`;
-            
-            // Log the experiment setup for easy reading
-            const experimentSetup = {
-                condition: selectedCondition,
-                counterbalance: selectedCB,
-                factors: experimentFactors,
-                videoFile: videoFilename
-            };
-            
-            console.log("EXPERIMENT SETUP:", experimentSetup);
-            
-            // In debug mode, show the setup on screen
-            if (debugMode) {
-                statusMessage.style.display = 'block';
-                statusMessage.textContent = JSON.stringify(experimentSetup, null, 2);
-            }
-            
-            // Create overlay config based on selected condition and CB
-            let overlayConfig = [];
-            
-            // Create overlay config for each image timing
-            overlayTimings.forEach(timing => {
-                const slideNum = timing.slide;
-                const imgPath = `${IMG_PATH}/${selectedCondition}/${selectedCondition}_CB${selectedCB}_slide_${slideNum}.png`;
+            // If we've reached the start of a freeze point and we're not already frozen
+            if (currentTime >= freezePoint.start && !isVideoFrozen) {
+                freezeVideo();
+                isVideoFrozen = true;
+                logDebug(`Freezing video at ${currentTime.toFixed(2)} until ${freezePoint.end}`);
                 
-                overlayConfig.push({
-                    imageSrc: imgPath,
-                    startTime: timing.startTime,
-                    endTime: timing.endTime
-                });
-            });
-            
-            // Load the video
-            video.load();
-            
-            // Set current time to 0 to show first frame
-            video.addEventListener('loadedmetadata', function() {
-                video.currentTime = 0;
-            });
-            
-            // Create all the overlay images
-            overlayConfig.forEach((config, index) => {
-                const overlay = document.createElement('img');
-                overlay.src = config.imageSrc;
-                overlay.className = 'overlay-image';
-                overlay.id = `overlay-${index}`;
-                overlay.style.display = 'none';
-                playerContainer.appendChild(overlay);
-            });
-            
-            // Show/hide overlays based on video time
-            function updateOverlays() {
-                const currentTime = video.currentTime;
-                
-                // Check each overlay to see if it should be visible
-                overlayConfig.forEach((config, index) => {
-                    const overlay = document.getElementById(`overlay-${index}`);
-                    if (currentTime >= config.startTime && currentTime < config.endTime) {
-                        overlay.style.display = 'block';
-                    } else {
-                        overlay.style.display = 'none';
-                    }
-                });
-                
-                // Keep updating while video plays
-                if (!video.paused) {
-                    requestAnimationFrame(updateOverlays);
-                }
-            }
-            
-            // Start playing when clicked
-            initialPlayButton.addEventListener('click', function() {
-                // Try to play the video
-                video.play()
-                    .then(() => {
-                        updateOverlays();
-                        initialPlayButton.style.display = 'none';
+                // Schedule unfreezing
+                setTimeout(() => {
+                    if (isVideoFrozen) {
+                        unfreezeVideo();
+                        isVideoFrozen = false;
+                        currentFreezeIndex++;
+                        logDebug(`Unfreezing video to continue at ${freezePoint.end}`);
                         
-                        // Handle audio later as mentioned
-                    })
-                    .catch(error => {
-                        console.error('Video play failed:', error);
-                    });
-            });
-            
-            // When video ends
-            video.addEventListener('ended', function() {
-                if (autoAdvance) {
-                    // Tell lookit to move to next frame
-                    window.parent.postMessage({
-                        type: 'nextFrame'
-                    }, '*');
-                }
-            });
-            
-            // Message handler for lookit
-            window.addEventListener('message', function(event) {
-                if (event.data && event.data.type) {
-                    switch (event.data.type) {
-                        case 'play':
-                            video.play()
-                                .then(() => {
-                                    updateOverlays();
-                                })
-                                .catch(e => console.error('Video play failed:', e));
-                            break;
-                        case 'pause':
-                            video.pause();
-                            break;
-                        case 'setCondition':
-                            if (event.data.condition && event.data.cb) {
-                                window.location.href = window.location.pathname + 
-                                    '?condition=' + event.data.condition +
-                                    '&cb=' + event.data.cb +
-                                    '&autoAdvance=' + autoAdvance +
-                                    (debugMode ? '&debug=true' : '');
-                            }
-                            break;
+                        // Set current time to end of freeze
+                        videoElement.currentTime = freezePoint.end;
                     }
+                }, (freezePoint.end - freezePoint.start) * 1000);
+            }
+        }
+        
+        function freezeVideo() {
+            // Pause the video to freeze it
+            videoElement.pause();
+        }
+        
+        function unfreezeVideo() {
+            // Resume video playback
+            videoElement.play();
+        }
+        
+        function playAudio(audioName) {
+            // Get audio element
+            const audio = audioElements[audioName];
+            
+            if (audio) {
+                // Reset to beginning
+                audio.currentTime = 0;
+                
+                // Play the audio
+                audio.play()
+                    .catch(error => {
+                        logDebug(`Error playing audio ${audioName}: ${error.message}`);
+                    });
+            } else {
+                logDebug(`Audio not found: ${audioName}`);
+            }
+        }
+        
+        function onVideoEnded() {
+            logDebug('Video playback ended');
+            
+            // Tell parent frame to move to next step if applicable
+            window.parent.postMessage({
+                type: 'nextFrame'
+            }, '*');
+        }
+        
+        function onMessageReceived(event) {
+            if (event.data && event.data.type) {
+                switch (event.data.type) {
+                    case 'play':
+                        videoElement.play();
+                        break;
+                        
+                    case 'pause':
+                        videoElement.pause();
+                        break;
+                        
+                    case 'setCondition':
+                        // Reload page with new condition
+                        if (event.data.version && event.data.cb) {
+                            const url = new URL(window.location);
+                            url.searchParams.set('task', event.data.version.split('_')[0]);
+                            url.searchParams.set('version', event.data.version.split('_')[1]);
+                            url.searchParams.set('cb', event.data.cb);
+                            window.location.href = url.toString();
+                        }
+                        break;
                 }
-            });
-        });
+            }
+        }
+        
+        function logDebug(message) {
+            if (debugMode) {
+                const now = new Date();
+                const timestamp = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}.${now.getMilliseconds()}`;
+                
+                // Add to debug panel
+                const logEntry = document.createElement('div');
+                logEntry.textContent = `${timestamp} - ${message}`;
+                debugPanel.appendChild(logEntry);
+                
+                // Auto-scroll to bottom
+                debugPanel.scrollTop = debugPanel.scrollHeight;
+                
+                // Also log to console
+                console.log(`[Gazorp] ${message}`);
+            }
+        }
+        
+        // Start initialization when document is ready
+        document.addEventListener('DOMContentLoaded', initExperiment);
     </script>
 </body>
 </html>
