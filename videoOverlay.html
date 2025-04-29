@@ -174,10 +174,12 @@
             // Get factors for this counterbalance
             factors = cbFactors[taskType][currentCB];
             
-            // Set video source using the updated path structure with the correct version type
-            // Now using: /mp4/[versionType]_[taskType]/[versionType]_[taskType]_CB[cb].mp4
-            const videoFileName = `${versionType}_${taskType}/${taskType}_${versionType}_CB${currentCB}.mp4`;
-            videoElement.src = `${videoPath}/${videoFileName}`;
+            // Set video source using the correct file structure
+            // Now using the correct path format: /mp4/[versionType]_[taskType]/[versionType]_[taskType]_CB[cb].mp4 
+            const videoFolderName = `${versionType}_${taskType}`;
+            const videoFileName = `${versionType}_${taskType}_CB${currentCB}.mp4`;
+            const videoFilePath = `${videoPath}/${videoFolderName}/${videoFileName}`;
+            videoElement.src = videoFilePath;
             
             // Build the customized audio script for this condition
             buildAudioScript();
@@ -185,7 +187,7 @@
             // Log experiment setup
             logDebug(`Experiment setup: ${currentVersion}, CB${currentCB}`);
             logDebug(`Factors: ${JSON.stringify(factors)}`);
-            logDebug(`Video: ${videoFileName}`);
+            logDebug(`Video: ${videoFilePath}`);
             
             // Set up event listeners
             setupEventListeners();
@@ -393,12 +395,31 @@
             videoElement.addEventListener('loadedmetadata', onVideoLoaded);
             videoElement.addEventListener('timeupdate', onTimeUpdate);
             videoElement.addEventListener('ended', onVideoEnded);
+            videoElement.addEventListener('error', onVideoError);
             
             // Start button
             startButton.addEventListener('click', startPlayback);
             
             // Message handlers for Lookit
             window.addEventListener('message', onMessageReceived);
+        }
+        
+        function onVideoError(e) {
+            logDebug(`Video error: ${videoElement.error ? videoElement.error.message : 'Unknown error'}`);
+            logDebug(`Error code: ${videoElement.error ? videoElement.error.code : 'N/A'}`);
+            logDebug(`Current src: ${videoElement.currentSrc}`);
+            
+            // Show error in debug panel and on screen
+            statusMessage = document.createElement('div');
+            statusMessage.style.position = 'absolute';
+            statusMessage.style.top = '10px';
+            statusMessage.style.left = '10px';
+            statusMessage.style.backgroundColor = 'rgba(255,0,0,0.8)';
+            statusMessage.style.color = 'white';
+            statusMessage.style.padding = '10px';
+            statusMessage.style.borderRadius = '5px';
+            statusMessage.textContent = `Error loading video: ${videoElement.currentSrc}`;
+            playerContainer.appendChild(statusMessage);
         }
         
         function onVideoLoaded() {
@@ -554,36 +575,3 @@
                         // Reload page with new condition
                         if (event.data.version && event.data.cb) {
                             const url = new URL(window.location);
-                            url.searchParams.set('task', event.data.version.split('_')[0]);
-                            url.searchParams.set('version', event.data.version.split('_')[1]);
-                            url.searchParams.set('cb', event.data.cb);
-                            window.location.href = url.toString();
-                        }
-                        break;
-                }
-            }
-        }
-        
-        function logDebug(message) {
-            if (debugMode) {
-                const now = new Date();
-                const timestamp = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}.${now.getMilliseconds()}`;
-                
-                // Add to debug panel
-                const logEntry = document.createElement('div');
-                logEntry.textContent = `${timestamp} - ${message}`;
-                debugPanel.appendChild(logEntry);
-                
-                // Auto-scroll to bottom
-                debugPanel.scrollTop = debugPanel.scrollHeight;
-                
-                // Also log to console
-                console.log(`[Gazorp] ${message}`);
-            }
-        }
-        
-        // Start initialization when document is ready
-        document.addEventListener('DOMContentLoaded', initExperiment);
-    </script>
-</body>
-</html>
