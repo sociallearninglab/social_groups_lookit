@@ -175,6 +175,7 @@
             factors = cbFactors[taskType][currentCB];
             
             // Set video source - always use CD version for videos
+            // Use the correct video filename format: CD_[taskType]_CB[cb].mp4
             const videoFileName = `CD_${taskType}_CB${currentCB}.mp4`;
             videoElement.src = `${videoPath}/${videoFileName}`;
             
@@ -345,10 +346,10 @@
                     { time: 430, audio: "test_new_gazorp", freeze_start: 431, freeze_end: 447 },
                     { time: 435, audio: "test_lost_shirt", freeze_start: null, freeze_end: null },
                     { time: 449, audio: "oh_wow", freeze_start: null, freeze_end: null },
-                    { time: 451, audio: factors.predicted_fruit === 'Kiki' ? "question_like_what_kiki" : "question_like_what_bubba", freeze_start: null, freeze_end: null },
+                    { time: 451, audio: "question_like_what_kiki", freeze_start: null, freeze_end: null },
                     { time: 456, audio: "click_fruit", freeze_start: 456, freeze_end: 466 },
                     { time: 461, audio: "right_likes", freeze_start: null, freeze_end: null },
-                    { time: 466, audio: factors.predicted_fruit === 'Kiki' ? "kiki" : "bubba", freeze_start: null, freeze_end: null },
+                    { time: 466, audio: "kiki", freeze_start: null, freeze_end: null },
                     { time: 467, audio: "so_question", freeze_start: null, freeze_end: null },
                     { time: 471, audio: factors.predicted_team === 'Red' ? "question_team_red" : "question_team_blue", freeze_start: null, freeze_end: null },
                     { time: 472, audio: "why_team", freeze_start: null, freeze_end: null },
@@ -580,7 +581,7 @@
                 console.log(`[Gazorp] ${message}`);
             }
         }
-        
+
         // Start initialization when document is ready
         document.addEventListener('DOMContentLoaded', initExperiment);
     </script>
