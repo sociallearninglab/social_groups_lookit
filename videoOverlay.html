@@ -481,3 +481,145 @@
             
             // Reset played flags on audio queue
             currentAudioQueue.forEach(item => item.played = false);
+
+            // Start playback
+            videoElement.play();
+            logDebug('Playback started');
+        }
+        
+        function onTimeUpdate() {
+            const currentTime = videoElement.currentTime;
+            
+            // Check for audio events
+            checkAudioEvents(currentTime);
+            
+            // Check for freeze points
+            checkFreezePoints(currentTime);
+        }
+        
+        function checkAudioEvents(currentTime) {
+            // Find audio events that should play
+            for (let i = 0; i < currentAudioQueue.length; i++) {
+                const event = currentAudioQueue[i];
+                
+                // If we're within 0.1 second of the event time and the audio hasn't played yet
+                if (Math.abs(currentTime - event.time) < 0.1 && !event.played) {
+                    playAudio(event.audio);
+                    event.played = true;
+                    logDebug(`Playing audio: ${event.audio} at ${currentTime.toFixed(2)}`);
+                }
+            }
+        }
+        
+        function checkFreezePoints(currentTime) {
+            // Skip if we're already at the end of freeze points
+            if (currentFreezeIndex >= freezePoints.length) return;
+            
+            const freezePoint = freezePoints[currentFreezeIndex];
+            
+            // If we've reached the start of a freeze point and we're not already frozen
+            if (currentTime >= freezePoint.start && !isVideoFrozen) {
+                freezeVideo();
+                isVideoFrozen = true;
+                logDebug(`Freezing video at ${currentTime.toFixed(2)} until ${freezePoint.end}`);
+                
+                // Schedule unfreezing
+                setTimeout(() => {
+                    if (isVideoFrozen) {
+                        unfreezeVideo();
+                        isVideoFrozen = false;
+                        currentFreezeIndex++;
+                        logDebug(`Unfreezing video to continue at ${freezePoint.end}`);
+                        
+                        // Set current time to end of freeze
+                        videoElement.currentTime = freezePoint.end;
+                    }
+                }, (freezePoint.end - freezePoint.start) * 1000);
+            }
+        }
+        
+        function freezeVideo() {
+            // Pause the video to freeze it
+            videoElement.pause();
+        }
+        
+        function unfreezeVideo() {
+            // Resume video playback
+            videoElement.play();
+        }
+        
+        function playAudio(audioName) {
+            // Get audio element
+            const audio = audioElements[audioName];
+            
+            if (audio) {
+                // Reset to beginning
+                audio.currentTime = 0;
+                
+                // Play the audio
+                audio.play()
+                    .catch(error => {
+                        logDebug(`Error playing audio ${audioName}: ${error.message}`);
+                    });
+            } else {
+                logDebug(`Audio not found: ${audioName}`);
+            }
+        }
+        
+        function onVideoEnded() {
+            logDebug('Video playback ended');
+            
+            // Tell parent frame to move to next step if applicable
+            window.parent.postMessage({
+                type: 'nextFrame'
+            }, '*');
+        }
+        
+        function onMessageReceived(event) {
+            if (event.data && event.data.type) {
+                switch (event.data.type) {
+                    case 'play':
+                        videoElement.play();
+                        break;
+                        
+                    case 'pause':
+                        videoElement.pause();
+                        break;
+                        
+                    case 'setCondition':
+                        // Reload page with new condition
+                        if (event.data.version && event.data.cb) {
+                            const url = new URL(window.location);
+                            url.searchParams.set('task', event.data.version.split('_')[0]);
+                            url.searchParams.set('version', event.data.version.split('_')[1]);
+                            url.searchParams.set('cb', event.data.cb);
+                            window.location.href = url.toString();
+                        }
+                        break;
+                }
+            }
+        }
+        
+        function logDebug(message) {
+            if (debugMode) {
+                const now = new Date();
+                const timestamp = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}.${now.getMilliseconds()}`;
+                
+                // Add to debug panel
+                const logEntry = document.createElement('div');
+                logEntry.textContent = `${timestamp} - ${message}`;
+                debugPanel.appendChild(logEntry);
+                
+                // Auto-scroll to bottom
+                debugPanel.scrollTop = debugPanel.scrollHeight;
+                
+                // Also log to console
+                console.log(`[Gazorp] ${message}`);
+            }
+        }
+        
+        // Start initialization when document is ready
+        document.addEventListener('DOMContentLoaded', initExperiment);
+    </script>
+</body>
+</html>
