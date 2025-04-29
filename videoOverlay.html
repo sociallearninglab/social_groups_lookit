@@ -3,170 +3,481 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gazorp Test Page</title>
+    <title>Gazorp Experiment Player</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
         }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
+        .player-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
-        button {
-            padding: 10px 15px;
-            margin: 10px 0;
+        #videoElement {
+            max-width: 100%;
+            max-height: 100%;
+        }
+        .debug-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            max-width: 300px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        #startButton {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 15px 30px;
+            font-size: 18px;
             background-color: #4CAF50;
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 5px;
             cursor: pointer;
-        }
-        #videoPlayer {
-            max-width: 100%;
-            margin-top: 20px;
-        }
-        #debugOutput {
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #f5f5f5;
-            border: 1px solid #ddd;
-            min-height: 100px;
+            z-index: 100;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Gazorp Test Page</h1>
-        
-        <div>
-            <button id="testButton">Test Script</button>
-            <button id="loadVideoButton">Test Video Load</button>
-        </div>
-        
-        <video id="videoPlayer" controls>
+    <div class="player-container" id="playerContainer">
+        <video id="videoElement" playsinline>
             <source src="" type="video/mp4">
-            Your browser does not support the video tag.
         </video>
-        
-        <div>
-            <h3>Debug Output:</h3>
-            <div id="debugOutput"></div>
-        </div>
+        <button id="startButton">Start Experiment</button>
     </div>
     
+    <div id="debugPanel" class="debug-panel"></div>
+
     <script>
-        // Basic variables
-        const debugOutput = document.getElementById('debugOutput');
-        const videoPlayer = document.getElementById('videoPlayer');
-        const testButton = document.getElementById('testButton');
-        const loadVideoButton = document.getElementById('loadVideoButton');
+        // Main configuration
+        const baseUrl = ''; // Base URL for resources, empty for relative paths
+        const videoPath = `${baseUrl}/mp4`;
+        const audioPath = `${baseUrl}/mp3`;
         
-        // Check if elements were found
-        function logMessage(message) {
-            const timestamp = new Date().toISOString().substr(11, 8);
-            const logEntry = document.createElement('div');
-            logEntry.textContent = `${timestamp} - ${message}`;
-            debugOutput.appendChild(logEntry);
-            console.log(`[Test] ${message}`);
+        // Debug mode flag
+        const debugMode = new URLSearchParams(window.location.search).get('debug') === 'true';
+        
+        // Elements
+        const videoElement = document.getElementById('videoElement');
+        const startButton = document.getElementById('startButton');
+        const debugPanel = document.getElementById('debugPanel');
+        const playerContainer = document.getElementById('playerContainer');
+        
+        // If debug mode, show debug panel
+        if (debugMode) {
+            debugPanel.style.display = 'block';
         }
         
-        // Test if JavaScript is running properly
-        document.addEventListener('DOMContentLoaded', function() {
-            logMessage('Page loaded, JavaScript is running');
+        // Audio elements cache
+        const audioElements = {};
+        
+        // Experiment configuration
+        const experimentVersions = ['group_CD', 'group_Cx', 'group_xD', 'pref_CD', 'pref_Cx', 'pref_xD'];
+        const groupCounterbalances = ['01', '02', '05', '06', '09', '10', '13', '14'];
+        const prefCounterbalances = ['01', '03', '05', '07', '09', '11', '13', '15'];
+        
+        // Experiment state
+        let currentVersion;
+        let currentCB;
+        let isGroupTask;
+        let factors;
+        let currentAudioQueue = [];
+        let freezePoints = [];
+        let currentFreezeIndex = 0;
+        let isVideoFrozen = false;
+        let isFreezeScheduled = false;
+        let currentScheduledTimeout = null;
+        
+        // Default audio script template - this will be customized based on counterbalance factors
+        const audioScriptTemplate = {
+            // Base script shared by all versions
+            base: [
+                // Slide 1: Introduction
+                { time: 0, audio: "intro_gazoom", freeze_start: 4, freeze_end: 12.6 },
+                
+                // Slide 2: Team Introduction
+                { time: 12.6, audio: "intro_gazorps", freeze_start: 13, freeze_end: 24 },
+                
+                // Slide 3: Team Questions will be dynamically assigned
+                
+                // Slide 4: Fruit Introduction
+                { time: 62, audio: "fruits_intro", freeze_start: 62, freeze_end: 72 },
+                
+                // Slide 5: Fruit Questions will be dynamically assigned
+                
+                // Slide 6: Snack Time Introduction
+                { time: 107, audio: "intro_snacktime", freeze_start: 107, freeze_end: 123 },
+                
+                // Slide 7: Song Introduction
+                { time: 123, audio: "song_intro", freeze_start: null, freeze_end: 136 }
+                
+                // Remaining slides will be added dynamically based on factors
+            ]
+        };
+        
+        // Counterbalance factor mappings
+        const cbFactors = {
+            group: {
+                '01': { predicted_fruit: 'Kiki', predicted_team: 'Red', fruit_left: 'Kiki', team_first: 'Red' },
+                '02': { predicted_fruit: 'Kiki', predicted_team: 'Blue', fruit_left: 'Kiki', team_first: 'Red' },
+                '05': { predicted_fruit: 'Kiki', predicted_team: 'Red', fruit_left: 'Kiki', team_first: 'Blue' },
+                '06': { predicted_fruit: 'Kiki', predicted_team: 'Blue', fruit_left: 'Kiki', team_first: 'Blue' },
+                '09': { predicted_fruit: 'Kiki', predicted_team: 'Red', fruit_left: 'Bubba', team_first: 'Red' },
+                '10': { predicted_fruit: 'Kiki', predicted_team: 'Blue', fruit_left: 'Bubba', team_first: 'Red' },
+                '13': { predicted_fruit: 'Kiki', predicted_team: 'Red', fruit_left: 'Bubba', team_first: 'Blue' },
+                '14': { predicted_fruit: 'Kiki', predicted_team: 'Blue', fruit_left: 'Bubba', team_first: 'Blue' }
+            },
+            pref: {
+                '01': { predicted_fruit: 'Kiki', predicted_team: 'Red', fruit_left: 'Kiki', team_first: 'Red' },
+                '03': { predicted_fruit: 'Bubba', predicted_team: 'Red', fruit_left: 'Kiki', team_first: 'Red' },
+                '05': { predicted_fruit: 'Kiki', predicted_team: 'Red', fruit_left: 'Kiki', team_first: 'Blue' },
+                '07': { predicted_fruit: 'Bubba', predicted_team: 'Red', fruit_left: 'Kiki', team_first: 'Blue' },
+                '09': { predicted_fruit: 'Kiki', predicted_team: 'Red', fruit_left: 'Bubba', team_first: 'Red' },
+                '11': { predicted_fruit: 'Bubba', predicted_team: 'Red', fruit_left: 'Bubba', team_first: 'Red' },
+                '13': { predicted_fruit: 'Kiki', predicted_team: 'Red', fruit_left: 'Bubba', team_first: 'Blue' },
+                '15': { predicted_fruit: 'Bubba', predicted_team: 'Red', fruit_left: 'Bubba', team_first: 'Blue' }
+            }
+        };
+        
+        // Initialize experiment
+        function initExperiment() {
+            // Get experiment parameters from URL or randomly assign
+            const params = new URLSearchParams(window.location.search);
             
-            // Check if elements were found
-            if (!debugOutput) logMessage('ERROR: Debug output element not found');
-            if (!videoPlayer) logMessage('ERROR: Video player element not found');
-            if (!testButton) logMessage('ERROR: Test button element not found');
-            if (!loadVideoButton) logMessage('ERROR: Load video button element not found');
-        });
-        
-        // Add button event listeners
-        if (testButton) {
-            testButton.addEventListener('click', function() {
-                logMessage('Test button clicked');
-                // Test the URL parsing
-                const url = new URL(window.location.href);
-                logMessage(`Current URL: ${url.href}`);
-                
-                // Test parameter extraction
-                const task = url.searchParams.get('task') || 'default_task';
-                const version = url.searchParams.get('version') || 'default_version';
-                const cb = url.searchParams.get('cb') || 'default_cb';
-                
-                logMessage(`Task: ${task}`);
-                logMessage(`Version: ${version}`);
-                logMessage(`CB: ${cb}`);
-                
-                // Test filepath generation
-                if (version === 'CD') {
-                    logMessage(`CD filename would be: ${version}_${task}_CB${cb}.mp4`);
-                } else {
-                    logMessage(`Other filename would be: ${task}_${version}_CB${cb}.mov`);
-                }
-            });
+            // Select version (group or pref + CD, Cx, or xD)
+            let taskType = params.get('task') || (Math.random() < 0.5 ? 'group' : 'pref');
+            let versionType = params.get('version') || ['CD', 'Cx', 'xD'][Math.floor(Math.random() * 3)];
+            currentVersion = `${taskType}_${versionType}`;
+            
+            // Is this a group task?
+            isGroupTask = taskType === 'group';
+            
+            // Select counterbalance
+            const validCBs = isGroupTask ? groupCounterbalances : prefCounterbalances;
+            currentCB = params.get('cb') || validCBs[Math.floor(Math.random() * validCBs.length)];
+            
+            // Get factors for this counterbalance
+            factors = cbFactors[taskType][currentCB];
+            
+            // Set video source using the correct file structure based on the version
+            const videoFolderName = `${versionType}_${taskType}`;
+            
+            // All videos now use .mp4 format following conversion
+            let videoFileName;
+            
+            if (versionType === 'CD') {
+                // For CD files: CD_[taskType]_CB[cb].mp4
+                videoFileName = `${versionType}_${taskType}_CB${currentCB}.mp4`;
+            } else {
+                // For other files: [taskType]_[versionType]_CB[cb].mp4 (was .mov before conversion)
+                videoFileName = `${taskType}_${versionType}_CB${currentCB}.mp4`;
+            }
+            
+            const videoFilePath = `${videoPath}/${videoFolderName}/${videoFileName}`;
+            
+            // Set the video source
+            const sourceElement = videoElement.querySelector('source');
+            sourceElement.src = videoFilePath;
+            sourceElement.type = "video/mp4";
+            
+            // Build the customized audio script for this condition
+            buildAudioScript();
+            
+            // Log experiment setup
+            logDebug(`Experiment setup: ${currentVersion}, CB${currentCB}`);
+            logDebug(`Factors: ${JSON.stringify(factors)}`);
+            logDebug(`Video: ${videoFilePath}`);
+            
+            // Set up event listeners
+            setupEventListeners();
+            
+            // Load video
+            videoElement.load();
         }
         
-        // Test video loading
-        if (loadVideoButton) {
-            loadVideoButton.addEventListener('click', function() {
-                logMessage('Attempting to load a test video');
-                
-                // Get parameters from URL
-                const url = new URL(window.location.href);
-                const task = url.searchParams.get('task') || 'pref';
-                const version = url.searchParams.get('version') || 'Cx';
-                const cb = url.searchParams.get('cb') || '09';
-                
-                // Determine the correct filename format based on the version
-                let videoFileName, videoType;
-                const videoFolderName = `${version}_${task}`;
-                
-                if (version === 'CD') {
-                    // For CD files: CD_[taskType]_CB[cb].mp4
-                    videoFileName = `${version}_${task}_CB${cb}.mp4`;
-                    videoType = "video/mp4";
-                } else {
-                    // For other files: [taskType]_[versionType]_CB[cb].mov
-                    videoFileName = `${task}_${version}_CB${cb}.mov`;
-                    videoType = "video/quicktime";
-                }
-                
-                // Form the video path
-                const videoUrl = `/mp4/${videoFolderName}/${videoFileName}`;
-                
-                // Set the video source
-                videoPlayer.src = videoUrl;
-                const sourceElement = videoPlayer.querySelector('source');
-                if (sourceElement) {
-                    sourceElement.src = videoUrl;
-                    sourceElement.type = videoType;
-                } else {
-                    logMessage('Source element not found, creating one');
-                    const source = document.createElement('source');
-                    source.src = videoUrl;
-                    source.type = videoType;
-                    videoPlayer.appendChild(source);
-                }
-                
-                logMessage(`Setting video source to: ${videoUrl}`);
-                
-                // Add event listeners for video element
-                videoPlayer.addEventListener('loadeddata', function() {
-                    logMessage('Video loaded successfully!');
-                });
-                
-                videoPlayer.addEventListener('error', function(e) {
-                    logMessage(`Video error: ${videoPlayer.error ? videoPlayer.error.message : 'Unknown error'}`);
-                    logMessage(`Error code: ${videoPlayer.error ? videoPlayer.error.code : 'N/A'}`);
-                    logMessage(`Current src: ${videoPlayer.currentSrc}`);
-                });
-                
-                // Load and play the video
-                videoPlayer.load();
-            });
+        function buildAudioScript() {
+            // Start with the base script
+            let script = [...audioScriptTemplate.base];
+            
+            // Add team introduction based on factors
+            if (factors.team_first === 'Red') {
+                script.push(
+                    { time: 21, audio: "red_team_first", freeze_start: null, freeze_end: null },
+                    { time: 25, audio: "blue_team_second", freeze_start: null, freeze_end: null }
+                );
+            } else {
+                script.push(
+                    { time: 21, audio: "blue_team_first", freeze_start: null, freeze_end: null },
+                    { time: 25, audio: "red_team_second", freeze_start: null, freeze_end: null }
+                );
+            }
+            
+            // Add team questions based on which team is on the left (fruit_left determines this)
+            if (factors.fruit_left === 'Kiki') {
+                // Red team on left
+                script.push(
+                    { time: 29, audio: "question_point_red", freeze_start: 29, freeze_end: 34 },
+                    { time: 34, audio: "good_job", freeze_start: null, freeze_end: null },
+                    { time: 47, audio: "question_point_blue", freeze_start: 51, freeze_end: 56 },
+                    { time: 56, audio: "good_job", freeze_start: null, freeze_end: null }
+                );
+            } else {
+                // Blue team on left
+                script.push(
+                    { time: 29, audio: "question_point_blue", freeze_start: 29, freeze_end: 34 },
+                    { time: 34, audio: "good_job", freeze_start: null, freeze_end: null },
+                    { time: 47, audio: "question_point_red", freeze_start: 51, freeze_end: 56 },
+                    { time: 56, audio: "good_job", freeze_start: null, freeze_end: null }
+                );
+            }
+            
+            // Add fruit introduction based on which fruit is on the left
+            if (factors.fruit_left === 'Kiki') {
+                script.push(
+                    { time: 68, audio: "kiki_first", freeze_start: null, freeze_end: null },
+                    { time: 77, audio: "bubba_second", freeze_start: null, freeze_end: null }
+                );
+            } else {
+                script.push(
+                    { time: 68, audio: "bubba_first", freeze_start: null, freeze_end: null },
+                    { time: 77, audio: "kiki_second", freeze_start: null, freeze_end: null }
+                );
+            }
+            
+            // Add fruit questions based on which fruit is on the left
+            if (factors.fruit_left === 'Kiki') {
+                script.push(
+                    { time: 80, audio: "question_point_kiki", freeze_start: 80, freeze_end: 89 },
+                    { time: 89, audio: "good_job", freeze_start: null, freeze_end: null },
+                    { time: 95, audio: "question_point_bubba", freeze_start: 95, freeze_end: 101 },
+                    { time: 101, audio: "good_job", freeze_start: null, freeze_end: null }
+                );
+            } else {
+                script.push(
+                    { time: 80, audio: "question_point_bubba", freeze_start: 80, freeze_end: 89 },
+                    { time: 89, audio: "good_job", freeze_start: null, freeze_end: null },
+                    { time: 95, audio: "question_point_kiki", freeze_start: 95, freeze_end: 101 },
+                    { time: 101, audio: "good_job", freeze_start: null, freeze_end: null }
+                );
+            }
+            
+            // Add Red Team sequence
+            script.push(
+                { time: 136, audio: "song_red_start", freeze_start: 138, freeze_end: 142 },
+                { time: 148, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 149, audio: "count_red_one", freeze_start: null, freeze_end: null },
+                { time: 152, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 159, audio: "song_red_start", freeze_start: null, freeze_end: null },
+                { time: 166, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 170, audio: "count_red_two", freeze_start: null, freeze_end: null },
+                { time: 173, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 176, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 182, audio: "song_red_start", freeze_start: null, freeze_end: null },
+                { time: 192, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 193, audio: "count_red_three", freeze_start: null, freeze_end: null },
+                { time: 196, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 199, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 201, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 208, audio: "song_red_start", freeze_start: null, freeze_end: null },
+                { time: 217, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 218, audio: "count_red_four", freeze_start: null, freeze_end: null },
+                { time: 222, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 224, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 227, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 229, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 236, audio: "summary_red", freeze_start: 236, freeze_end: 251 },
+                { time: 251, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 253, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 256, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 258, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 260, audio: "transition_blue", freeze_start: null, freeze_end: null }
+            );
+            
+            // Add Blue Team sequence
+            script.push(
+                { time: 265, audio: "song_blue_start", freeze_start: null, freeze_end: null },
+                { time: 274, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 275, audio: "count_blue_one", freeze_start: null, freeze_end: null },
+                { time: 279, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 285, audio: "song_blue_start", freeze_start: null, freeze_end: null },
+                { time: 294.5, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 296, audio: "count_blue_two", freeze_start: null, freeze_end: null },
+                { time: 300, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 301, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 308, audio: "song_blue_start", freeze_start: null, freeze_end: null },
+                { time: 318, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 319, audio: "count_blue_three", freeze_start: null, freeze_end: null },
+                { time: 323, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 324.5, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 327.5, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 333, audio: "song_blue_start", freeze_start: null, freeze_end: null },
+                { time: 343, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 345, audio: "count_blue_four", freeze_start: null, freeze_end: null },
+                { time: 348, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 350, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 353, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 355.5, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 357, audio: "summary_blue", freeze_start: 362, freeze_end: 372 },
+                { time: 372, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 375, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 377.5, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 380, audio: "bubba", freeze_start: null, freeze_end: null }
+            );
+            
+            // Add final review
+            script.push(
+                { time: 381, audio: "transition_all", freeze_start: 386, freeze_end: 401 },
+                { time: 397, audio: "review_red", freeze_start: null, freeze_end: 401 },
+                { time: 402, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 404, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 406.5, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 408.5, audio: "kiki", freeze_start: null, freeze_end: null },
+                { time: 410, audio: "review_blue", freeze_start: 411, freeze_end: 415 },
+                { time: 414.5, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 417, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 419.5, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 422, audio: "bubba", freeze_start: null, freeze_end: null },
+                { time: 423, audio: "great_job", freeze_start: null, freeze_end: null }
+            );
+            
+            // Add task-specific final test question sequence
+            if (isGroupTask) {
+                // Infer Group Task
+                script.push(
+                    { time: 430, audio: "test_new_gazorp", freeze_start: 431, freeze_end: 447 },
+                    { time: 435, audio: "test_lost_shirt", freeze_start: null, freeze_end: null },
+                    { time: 449, audio: "oh_wow", freeze_start: null, freeze_end: null },
+                    { time: 451, audio: "question_like_what_kiki", freeze_start: null, freeze_end: null },
+                    { time: 456, audio: "click_fruit", freeze_start: 456, freeze_end: 466 },
+                    { time: 461, audio: "right_likes", freeze_start: null, freeze_end: null },
+                    { time: 466, audio: "kiki", freeze_start: null, freeze_end: null },
+                    { time: 467, audio: "so_question", freeze_start: null, freeze_end: null },
+                    { time: 471, audio: factors.predicted_team === 'Red' ? "question_team_red" : "question_team_blue", freeze_start: null, freeze_end: null },
+                    { time: 472, audio: "why_team", freeze_start: null, freeze_end: null },
+                    { time: 473, audio: factors.predicted_team === 'Red' ? "red_team" : "blue_team", freeze_start: null, freeze_end: 480 },
+                    { time: 487, audio: "closing", freeze_start: null, freeze_end: null }
+                );
+            } else {
+                // Infer Preference Task
+                script.push(
+                    { time: 430, audio: "test_new_gazorp", freeze_start: 430, freeze_end: 487 },
+                    { time: 435, audio: "test_no_snack", freeze_start: null, freeze_end: null },
+                    { time: 443.5, audio: "question_team_red", freeze_start: null, freeze_end: null },
+                    { time: 449.5, audio: "click_team", freeze_start: null, freeze_end: 462 },
+                    { time: 462, audio: "click_team_correct", freeze_start: null, freeze_end: null },
+                    { time: 467, audio: "red_team", freeze_start: null, freeze_end: null },
+                    { time: 469, audio: "so_question", freeze_start: null, freeze_end: null },
+                    { time: 473, audio: factors.predicted_fruit === 'Kiki' ? "question_like_what_kiki" : "question_like_what_bubba", freeze_start: null, freeze_end: 483 },
+                    { time: 483, audio: "why_likes", freeze_start: null, freeze_end: null },
+                    { time: 487, audio: factors.predicted_fruit === 'Kiki' ? "kiki" : "bubba", freeze_start: null, freeze_end: 494 },
+                    { time: 494, audio: "closing", freeze_start: null, freeze_end: null }
+                );
+            }
+            
+            // Set the current audio queue
+            currentAudioQueue = [...script];
+            
+            // Extract freeze points
+            freezePoints = script
+                .filter(item => item.freeze_start !== null && item.freeze_end !== null)
+                .map(item => ({ start: item.freeze_start, end: item.freeze_end }));
+            
+            // Sort by time
+            currentAudioQueue.sort((a, b) => a.time - b.time);
+            freezePoints.sort((a, b) => a.start - b.start);
+            
+            logDebug(`Prepared ${currentAudioQueue.length} audio events and ${freezePoints.length} freeze points`);
         }
-    </script>
-</body>
-</html>
+        
+        function setupEventListeners() {
+            // Video events
+            videoElement.addEventListener('loadedmetadata', onVideoLoaded);
+            videoElement.addEventListener('timeupdate', onTimeUpdate);
+            videoElement.addEventListener('ended', onVideoEnded);
+            videoElement.addEventListener('error', onVideoError);
+            
+            // Start button
+            startButton.addEventListener('click', startPlayback);
+            
+            // Message handlers for Lookit
+            window.addEventListener('message', onMessageReceived);
+        }
+        
+        function onVideoError(e) {
+            logDebug(`Video error: ${videoElement.error ? videoElement.error.message : 'Unknown error'}`);
+            logDebug(`Error code: ${videoElement.error ? videoElement.error.code : 'N/A'}`);
+            logDebug(`Current src: ${videoElement.currentSrc}`);
+            
+            // Show error in debug panel and on screen
+            const statusMessage = document.createElement('div');
+            statusMessage.style.position = 'absolute';
+            statusMessage.style.top = '10px';
+            statusMessage.style.left = '10px';
+            statusMessage.style.backgroundColor = 'rgba(255,0,0,0.8)';
+            statusMessage.style.color = 'white';
+            statusMessage.style.padding = '10px';
+            statusMessage.style.borderRadius = '5px';
+            statusMessage.textContent = `Error loading video: ${videoElement.currentSrc}`;
+            playerContainer.appendChild(statusMessage);
+        }
+        
+        function onVideoLoaded() {
+            logDebug('Video loaded, ready to play');
+            
+            // Create and preload all audio elements
+            preloadAudio();
+            
+            // Auto-start if specified in URL
+            if (new URLSearchParams(window.location.search).get('autostart') === 'true') {
+                startPlayback();
+            }
+        }
+        
+        function preloadAudio() {
+            // Create a Set of unique audio files needed
+            const uniqueAudio = new Set();
+            currentAudioQueue.forEach(item => uniqueAudio.add(item.audio));
+            
+            // Create audio elements for each file
+            uniqueAudio.forEach(audioFile => {
+                const audio = new Audio(`${audioPath}/${audioFile}.mp3`);
+                audio.preload = 'auto';
+                audioElements[audioFile] = audio;
+            });
+            
+            logDebug(`Preloaded ${uniqueAudio.size} audio files`);
+        }
+        
+        function startPlayback() {
+            // Hide start button
+            startButton.style.display = 'none';
+            
+            // Reset state
+            videoElement.currentTime = 0;
+            currentFreezeIndex = 0;
+            isVideoFrozen = false;
+            
+            // Reset all audio elements
+            Object.values(audioElements).forEach(audio => {
+                audio.pause();
+                audio.currentTime = 0;
+            });
+            
+            // Reset played flags on audio queue
+            currentAudioQueue.forEach(item => item.played = false);
