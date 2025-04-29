@@ -575,3 +575,36 @@
                         // Reload page with new condition
                         if (event.data.version && event.data.cb) {
                             const url = new URL(window.location);
+                            url.searchParams.set('task', event.data.version.split('_')[0]);
+                            url.searchParams.set('version', event.data.version.split('_')[1]);
+                            url.searchParams.set('cb', event.data.cb);
+                            window.location.href = url.toString();
+                        }
+                        break;
+                }
+            }
+        }
+        
+        function logDebug(message) {
+            if (debugMode) {
+                const now = new Date();
+                const timestamp = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}.${now.getMilliseconds()}`;
+                
+                // Add to debug panel
+                const logEntry = document.createElement('div');
+                logEntry.textContent = `${timestamp} - ${message}`;
+                debugPanel.appendChild(logEntry);
+                
+                // Auto-scroll to bottom
+                debugPanel.scrollTop = debugPanel.scrollHeight;
+                
+                // Also log to console
+                console.log(`[Gazorp] ${message}`);
+            }
+        }
+        
+        // Start initialization when document is ready
+        document.addEventListener('DOMContentLoaded', initExperiment);
+    </script>
+</body>
+</html>
