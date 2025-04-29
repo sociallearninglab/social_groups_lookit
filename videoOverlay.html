@@ -176,7 +176,7 @@
             
             // Set video source using the updated path structure with the correct version type
             // Now using: /mp4/[versionType]_[taskType]/[versionType]_[taskType]_CB[cb].mp4
-            const videoFileName = `${versionType}_${taskType}/${versionType}_${taskType}_CB${currentCB}.mp4`;
+            const videoFileName = `${versionType}_${taskType}/${taskType}_${versionType}_CB${currentCB}.mp4`;
             videoElement.src = `${videoPath}/${videoFileName}`;
             
             // Build the customized audio script for this condition
