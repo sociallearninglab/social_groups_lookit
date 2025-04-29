@@ -55,7 +55,7 @@
     </style>
 </head>
 <body>
-    <div class="player-container">
+    <div class="player-container" id="playerContainer">
         <video id="videoElement" playsinline>
             <source src="" type="video/mp4">
         </video>
@@ -77,6 +77,7 @@
         const videoElement = document.getElementById('videoElement');
         const startButton = document.getElementById('startButton');
         const debugPanel = document.getElementById('debugPanel');
+        const playerContainer = document.getElementById('playerContainer');
         
         // If debug mode, show debug panel
         if (debugMode) {
@@ -174,12 +175,29 @@
             // Get factors for this counterbalance
             factors = cbFactors[taskType][currentCB];
             
-            // Set video source using the correct file structure
-            // Now using the correct path format: /mp4/[versionType]_[taskType]/[versionType]_[taskType]_CB[cb].mp4 
+            // Set video source using the correct file structure based on the version
             const videoFolderName = `${versionType}_${taskType}`;
-            const videoFileName = `${versionType}_${taskType}_CB${currentCB}.mp4`;
+            
+            // Determine the correct filename format based on the versionType
+            let videoFileName;
+            let videoType = "mp4"; // Default extension
+            
+            if (versionType === 'CD') {
+                // For CD files: CD_[taskType]_CB[cb].mp4
+                videoFileName = `${versionType}_${taskType}_CB${currentCB}.mp4`;
+            } else {
+                // For other files: [taskType]_[versionType]_CB[cb].mov
+                videoFileName = `${taskType}_${versionType}_CB${currentCB}.mov`;
+                videoType = "mov"; // Change extension to .mov
+            }
+            
             const videoFilePath = `${videoPath}/${videoFolderName}/${videoFileName}`;
             videoElement.src = videoFilePath;
+            
+            // Update source element with correct MIME type
+            const sourceElement = videoElement.querySelector('source');
+            sourceElement.src = videoFilePath;
+            sourceElement.type = videoType === "mp4" ? "video/mp4" : "video/quicktime";
             
             // Build the customized audio script for this condition
             buildAudioScript();
@@ -410,7 +428,7 @@
             logDebug(`Current src: ${videoElement.currentSrc}`);
             
             // Show error in debug panel and on screen
-            statusMessage = document.createElement('div');
+            const statusMessage = document.createElement('div');
             statusMessage.style.position = 'absolute';
             statusMessage.style.top = '10px';
             statusMessage.style.left = '10px';
@@ -605,6 +623,5 @@
         
         // Start initialization when document is ready
         document.addEventListener('DOMContentLoaded', initExperiment);
-    </script>
-</body>
-</html>
+
+        
