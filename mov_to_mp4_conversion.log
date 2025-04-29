@@ -1,0 +1,42 @@
+2025-04-29 13:48:14,698 - INFO - Found 8 MOV files in /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_group
+2025-04-29 13:48:14,702 - INFO - Found 8 MOV files in /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_pref
+2025-04-29 13:48:14,703 - INFO - Found 8 MOV files in /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_group
+2025-04-29 13:48:14,703 - INFO - Found 8 MOV files in /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_pref
+2025-04-29 13:48:14,703 - INFO - Starting conversion of 32 MOV files with 4 workers
+2025-04-29 13:49:26,934 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_group/group_Cx_CB05.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_group/group_Cx_CB05.mp4
+2025-04-29 13:49:26,996 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_group/group_Cx_CB09.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_group/group_Cx_CB09.mp4
+2025-04-29 13:49:27,997 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_group/group_Cx_CB13.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_group/group_Cx_CB13.mp4
+2025-04-29 13:49:28,323 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_group/group_Cx_CB06.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_group/group_Cx_CB06.mp4
+2025-04-29 13:50:37,383 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_group/group_Cx_CB14.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_group/group_Cx_CB14.mp4
+2025-04-29 13:50:37,546 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_group/group_Cx_CB10.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_group/group_Cx_CB10.mp4
+2025-04-29 13:50:37,962 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_group/group_Cx_CB02.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_group/group_Cx_CB02.mp4
+2025-04-29 13:50:37,988 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_group/group_Cx_CB01.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_group/group_Cx_CB01.mp4
+2025-04-29 13:51:38,863 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_pref/pref_Cx_CB13.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_pref/pref_Cx_CB13.mp4
+2025-04-29 13:51:39,305 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_pref/pref_Cx_CB09.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_pref/pref_Cx_CB09.mp4
+2025-04-29 13:51:39,528 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_pref/pref_Cx_CB11.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_pref/pref_Cx_CB11.mp4
+2025-04-29 13:51:39,544 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_pref/pref_Cx_CB07.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_pref/pref_Cx_CB07.mp4
+2025-04-29 13:52:38,996 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_pref/pref_Cx_CB05.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_pref/pref_Cx_CB05.mp4
+2025-04-29 13:52:39,167 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_pref/pref_Cx_CB15.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_pref/pref_Cx_CB15.mp4
+2025-04-29 13:52:39,688 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_pref/pref_Cx_CB01.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_pref/pref_Cx_CB01.mp4
+2025-04-29 13:52:40,167 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_pref/pref_Cx_CB03.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/Cx_pref/pref_Cx_CB03.mp4
+2025-04-29 13:53:38,059 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_group/group_xD_CB09.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_group/group_xD_CB09.mp4
+2025-04-29 13:53:38,277 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_group/group_xD_CB10.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_group/group_xD_CB10.mp4
+2025-04-29 13:53:39,757 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_group/group_xD_CB05.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_group/group_xD_CB05.mp4
+2025-04-29 13:53:39,973 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_group/group_xD_CB13.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_group/group_xD_CB13.mp4
+2025-04-29 13:54:41,317 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_group/group_xD_CB06.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_group/group_xD_CB06.mp4
+2025-04-29 13:54:41,487 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_group/group_xD_CB02.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_group/group_xD_CB02.mp4
+2025-04-29 13:54:42,722 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_group/group_xD_CB01.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_group/group_xD_CB01.mp4
+2025-04-29 13:54:42,941 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_group/group_xD_CB14.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_group/group_xD_CB14.mp4
+2025-04-29 13:55:38,592 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_pref/pref_xD_CB05.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_pref/pref_xD_CB05.mp4
+2025-04-29 13:55:38,747 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_pref/pref_xD_CB09.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_pref/pref_xD_CB09.mp4
+2025-04-29 13:55:39,482 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_pref/pref_xD_CB07.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_pref/pref_xD_CB07.mp4
+2025-04-29 13:55:40,223 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_pref/pref_xD_CB11.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_pref/pref_xD_CB11.mp4
+2025-04-29 13:56:36,214 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_pref/pref_xD_CB03.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_pref/pref_xD_CB03.mp4
+2025-04-29 13:56:36,540 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_pref/pref_xD_CB13.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_pref/pref_xD_CB13.mp4
+2025-04-29 13:56:37,029 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_pref/pref_xD_CB01.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_pref/pref_xD_CB01.mp4
+2025-04-29 13:56:37,182 - INFO - Successfully converted: /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_pref/pref_xD_CB15.mov -> /Users/mokeeffe/Documents/GitHub/social_groups_lookit/mp4/xD_pref/pref_xD_CB15.mp4
+2025-04-29 13:56:37,183 - INFO - ==================================================
+2025-04-29 13:56:37,183 - INFO - Conversion Complete!
+2025-04-29 13:56:37,183 - INFO - Successfully converted: 32 files
+2025-04-29 13:56:37,183 - INFO - Failed conversions: 0 files
+2025-04-29 13:56:37,183 - INFO - ==================================================
