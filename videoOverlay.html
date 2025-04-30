@@ -33,10 +33,11 @@
             padding: 10px;
             font-family: monospace;
             font-size: 12px;
-            max-width: 300px;
-            max-height: 200px;
+            max-width: 500px;
+            max-height: 300px;
             overflow-y: auto;
             display: none;
+            z-index: 1000;
         }
         #startButton {
             position: absolute;
@@ -52,6 +53,17 @@
             cursor: pointer;
             z-index: 100;
         }
+        .status-message {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            z-index: 200;
+        }
     </style>
 </head>
 <body>
@@ -65,14 +77,73 @@
     <div id="debugPanel" class="debug-panel"></div>
 
     <script>
+        // Force debug mode on
+        const debugMode = true;
+        
+        // Log to both debug panel and console
+        function logDebug(message, level = 'info') {
+            const now = new Date();
+            const timestamp = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}.${now.getMilliseconds().toString().padStart(3, '0')}`;
+            
+            // Create message with timestamp
+            const fullMessage = `${timestamp} - ${message}`;
+            
+            // Add to debug panel
+            const debugPanel = document.getElementById('debugPanel');
+            if (debugPanel) {
+                const logEntry = document.createElement('div');
+                
+                // Set color based on level
+                if (level === 'error') {
+                    logEntry.style.color = '#ff6b6b';
+                } else if (level === 'warn') {
+                    logEntry.style.color = '#feca57';
+                } else if (level === 'success') {
+                    logEntry.style.color = '#1dd1a1';
+                }
+                
+                logEntry.textContent = fullMessage;
+                debugPanel.appendChild(logEntry);
+                
+                // Auto-scroll to bottom
+                debugPanel.scrollTop = debugPanel.scrollHeight;
+            }
+            
+            // Also log to console with appropriate method
+            if (level === 'error') {
+                console.error(`[Gazorp] ${message}`);
+            } else if (level === 'warn') {
+                console.warn(`[Gazorp] ${message}`);
+            } else {
+                console.log(`[Gazorp] ${message}`);
+            }
+        }
+        
+        // Show a status message on screen
+        function showStatusMessage(message, isError = false) {
+            // Remove any existing status messages
+            document.querySelectorAll('.status-message').forEach(el => el.remove());
+            
+            // Create new message
+            const statusMessage = document.createElement('div');
+            statusMessage.className = 'status-message';
+            statusMessage.style.backgroundColor = isError ? 'rgba(255,0,0,0.8)' : 'rgba(0,128,0,0.8)';
+            statusMessage.textContent = message;
+            
+            const playerContainer = document.getElementById('playerContainer');
+            if (playerContainer) {
+                playerContainer.appendChild(statusMessage);
+            }
+            
+            // Log to debug as well
+            logDebug(message, isError ? 'error' : 'success');
+        }
+        
         // Main configuration
         // Base URL for GitHub raw content
         const baseUrl = 'https://raw.githubusercontent.com/sociallearninglab/social_groups_lookit/main';
         const videoPath = `${baseUrl}/mp4`;
         const audioPath = `${baseUrl}/mp3`;
-        
-        // Debug mode flag
-        const debugMode = new URLSearchParams(window.location.search).get('debug') === 'true';
         
         // Elements
         const videoElement = document.getElementById('videoElement');
@@ -82,7 +153,9 @@
         
         // If debug mode, show debug panel
         if (debugMode) {
-            debugPanel.style.display = 'block';
+            if (debugPanel) {
+                debugPanel.style.display = 'block';
+            }
         }
         
         // Audio elements cache
@@ -104,6 +177,75 @@
         let isVideoFrozen = false;
         let isFreezeScheduled = false;
         let currentScheduledTimeout = null;
+        
+        // Initialize experiment
+        function initExperiment() {
+            // Log startup
+            logDebug('Gazorp Experiment Player Initializing', 'success');
+            logDebug(`Browser: ${navigator.userAgent}`);
+            
+            // Get experiment parameters from URL or randomly assign
+            const params = new URLSearchParams(window.location.search);
+            
+            // Select version (group or pref + CD, Cx, or xD)
+            let taskType = params.get('task') || (Math.random() < 0.5 ? 'group' : 'pref');
+            let versionType = params.get('version') || ['CD', 'Cx', 'xD'][Math.floor(Math.random() * 3)];
+            currentVersion = `${taskType}_${versionType}`;
+            
+            // Is this a group task?
+            isGroupTask = taskType === 'group';
+            
+            // Select counterbalance
+            const validCBs = isGroupTask ? groupCounterbalances : prefCounterbalances;
+            currentCB = params.get('cb') || validCBs[Math.floor(Math.random() * validCBs.length)];
+            
+            // Get factors for this counterbalance
+            factors = cbFactors[taskType][currentCB];
+            
+            // Set video source using the correct file structure based on the version
+            const videoFolderName = `${versionType}_${taskType}`;
+            
+            // All videos now use .mp4 format following conversion
+            let videoFileName;
+            
+            if (versionType === 'CD') {
+                // For CD files: CD_[taskType]_CB[cb].mp4
+                videoFileName = `${versionType}_${taskType}_CB${currentCB}.mp4`;
+            } else {
+                // For other files: [taskType]_[versionType]_CB[cb].mp4 (was .mov before conversion)
+                videoFileName = `${taskType}_${versionType}_CB${currentCB}.mp4`;
+            }
+            
+            const videoFilePath = `${videoPath}/${videoFolderName}/${videoFileName}`;
+            
+            // Set the video source
+            const sourceElement = videoElement.querySelector('source');
+            sourceElement.src = videoFilePath;
+            sourceElement.type = "video/mp4";
+            
+            // Log configuration
+            logDebug('==== EXPERIMENT CONFIGURATION ====', 'success');
+            logDebug(`Version: ${currentVersion}`);
+            logDebug(`Counterbalance: CB${currentCB}`);
+            logDebug(`Task Type: ${isGroupTask ? 'Group Task' : 'Preference Task'}`);
+            logDebug(`Video File: ${videoFileName}`);
+            logDebug(`Video Path: ${videoFilePath}`);
+            logDebug(`Factors: ${JSON.stringify(factors)}`);
+            
+            // Build the customized audio script for this condition
+            buildAudioScript();
+            
+            // Set up event listeners
+            setupEventListeners();
+            
+            // Load video
+            videoElement.load();
+            
+            // Show startup message
+            showStatusMessage(`Experiment loaded: ${currentVersion} (CB${currentCB})`, false);
+            
+            logDebug('==== INITIALIZATION COMPLETE ====', 'success');
+        }
         
         // Default audio script template - this will be customized based on counterbalance factors
         const audioScriptTemplate = {
@@ -156,63 +298,9 @@
             }
         };
         
-        // Initialize experiment
-        function initExperiment() {
-            // Get experiment parameters from URL or randomly assign
-            const params = new URLSearchParams(window.location.search);
-            
-            // Select version (group or pref + CD, Cx, or xD)
-            let taskType = params.get('task') || (Math.random() < 0.5 ? 'group' : 'pref');
-            let versionType = params.get('version') || ['CD', 'Cx', 'xD'][Math.floor(Math.random() * 3)];
-            currentVersion = `${taskType}_${versionType}`;
-            
-            // Is this a group task?
-            isGroupTask = taskType === 'group';
-            
-            // Select counterbalance
-            const validCBs = isGroupTask ? groupCounterbalances : prefCounterbalances;
-            currentCB = params.get('cb') || validCBs[Math.floor(Math.random() * validCBs.length)];
-            
-            // Get factors for this counterbalance
-            factors = cbFactors[taskType][currentCB];
-            
-            // Set video source using the correct file structure based on the version
-            const videoFolderName = `${versionType}_${taskType}`;
-            
-            // All videos now use .mp4 format following conversion
-            let videoFileName;
-            
-            if (versionType === 'CD') {
-                // For CD files: CD_[taskType]_CB[cb].mp4
-                videoFileName = `${versionType}_${taskType}_CB${currentCB}.mp4`;
-            } else {
-                // For other files: [taskType]_[versionType]_CB[cb].mp4 (was .mov before conversion)
-                videoFileName = `${taskType}_${versionType}_CB${currentCB}.mp4`;
-            }
-            
-            const videoFilePath = `${videoPath}/${videoFolderName}/${videoFileName}`;
-            
-            // Set the video source
-            const sourceElement = videoElement.querySelector('source');
-            sourceElement.src = videoFilePath;
-            sourceElement.type = "video/mp4";
-            
-            // Build the customized audio script for this condition
-            buildAudioScript();
-            
-            // Log experiment setup
-            logDebug(`Experiment setup: ${currentVersion}, CB${currentCB}`);
-            logDebug(`Factors: ${JSON.stringify(factors)}`);
-            logDebug(`Video: ${videoFilePath}`);
-            
-            // Set up event listeners
-            setupEventListeners();
-            
-            // Load video
-            videoElement.load();
-        }
-        
         function buildAudioScript() {
+            logDebug('Building audio script based on factors...');
+            
             // Start with the base script
             let script = [...audioScriptTemplate.base];
             
@@ -403,27 +491,55 @@
             currentAudioQueue.sort((a, b) => a.time - b.time);
             freezePoints.sort((a, b) => a.start - b.start);
             
+            // Log freeze points and audio events
             logDebug(`Prepared ${currentAudioQueue.length} audio events and ${freezePoints.length} freeze points`);
+            
+            // Log first few freeze points
+            logDebug('First few freeze points:');
+            freezePoints.slice(0, 3).forEach((point, index) => {
+                logDebug(`  Freeze ${index}: ${point.start}s to ${point.end}s (duration: ${(point.end - point.start).toFixed(1)}s)`);
+            });
         }
         
         function setupEventListeners() {
+            logDebug('Setting up event listeners...');
+            
             // Video events
             videoElement.addEventListener('loadedmetadata', onVideoLoaded);
             videoElement.addEventListener('timeupdate', onTimeUpdate);
             videoElement.addEventListener('ended', onVideoEnded);
             videoElement.addEventListener('error', onVideoError);
+            videoElement.addEventListener('play', () => logDebug('Video playback started'));
+            videoElement.addEventListener('pause', () => logDebug('Video playback paused'));
+            videoElement.addEventListener('seeking', () => logDebug(`Video seeking to ${videoElement.currentTime.toFixed(2)}s`));
             
             // Start button
             startButton.addEventListener('click', startPlayback);
             
             // Message handlers for Lookit
             window.addEventListener('message', onMessageReceived);
+            
+            // Additional error handling
+            window.addEventListener('error', (event) => {
+                logDebug(`Global error: ${event.message} at ${event.filename}:${event.lineno}`, 'error');
+            });
+            
+            // Unhandled promise rejection handling
+            window.addEventListener('unhandledrejection', (event) => {
+                logDebug(`Unhandled promise rejection: ${event.reason}`, 'error');
+            });
         }
         
         function onVideoError(e) {
-            logDebug(`Video error: ${videoElement.error ? videoElement.error.message : 'Unknown error'}`);
-            logDebug(`Error code: ${videoElement.error ? videoElement.error.code : 'N/A'}`);
-            logDebug(`Current src: ${videoElement.currentSrc}`);
+            logDebug(`Video error: ${videoElement.error ? videoElement.error.message : 'Unknown error'}`, 'error');
+            logDebug(`Error code: ${videoElement.error ? videoElement.error.code : 'N/A'}`, 'error');
+            logDebug(`Current src: ${videoElement.currentSrc}`, 'error');
+            
+            // Error code reference:
+            // 1 = MEDIA_ERR_ABORTED - The fetching process was aborted by the user
+            // 2 = MEDIA_ERR_NETWORK - A network error occurred while fetching the media
+            // 3 = MEDIA_ERR_DECODE - A decoding error occurred
+            // 4 = MEDIA_ERR_SRC_NOT_SUPPORTED - The media format is not supported
             
             // Show error in debug panel and on screen
             const statusMessage = document.createElement('div');
@@ -434,18 +550,70 @@
             statusMessage.style.color = 'white';
             statusMessage.style.padding = '10px';
             statusMessage.style.borderRadius = '5px';
-            statusMessage.textContent = `Error loading video: ${videoElement.currentSrc}`;
+            statusMessage.style.zIndex = '1000';
+            statusMessage.textContent = `Video Error: ${videoElement.error ? videoElement.error.message : 'Unknown error'} (${videoElement.currentSrc})`;
+            
+            // Try to get descriptive error
+            let errorDescription = "Unknown error";
+            if (videoElement.error) {
+                switch(videoElement.error.code) {
+                    case 1:
+                        errorDescription = "The video loading was aborted";
+                        break;
+                    case 2:
+                        errorDescription = "Network error while loading video";
+                        break;
+                    case 3:
+                        errorDescription = "Error decoding video format";
+                        break;
+                    case 4:
+                        errorDescription = "Video format not supported";
+                        break;
+                }
+                statusMessage.textContent += ` - ${errorDescription}`;
+            }
+            
             playerContainer.appendChild(statusMessage);
+            
+            // Display suggestions to fix
+            const suggestionMessage = document.createElement('div');
+            suggestionMessage.style.position = 'absolute';
+            suggestionMessage.style.top = '60px';
+            suggestionMessage.style.left = '10px';
+            suggestionMessage.style.backgroundColor = 'rgba(0,0,0,0.8)';
+            suggestionMessage.style.color = 'white';
+            suggestionMessage.style.padding = '10px';
+            suggestionMessage.style.borderRadius = '5px';
+            suggestionMessage.style.zIndex = '1000';
+            suggestionMessage.innerHTML = `
+                <p><strong>Troubleshooting:</strong></p>
+                <ul>
+                    <li>Verify the video file exists at the path: ${videoElement.currentSrc}</li>
+                    <li>Check that the file format is MP4</li>
+                    <li>Ensure GitHub permissions are correct</li>
+                    <li>Try a different browser</li>
+                </ul>
+            `;
+            playerContainer.appendChild(suggestionMessage);
         }
         
         function onVideoLoaded() {
-            logDebug('Video loaded, ready to play');
+            logDebug(`Video loaded: ${videoElement.videoWidth}x${videoElement.videoHeight}, duration: ${videoElement.duration.toFixed(2)}s`, 'success');
+            
+            // Log video details
+            const videoDetails = {
+                duration: videoElement.duration,
+                dimensions: `${videoElement.videoWidth}x${videoElement.videoHeight}`,
+                source: videoElement.currentSrc
+            };
+            logDebug(`Video details: ${JSON.stringify(videoDetails)}`);
             
             // Create and preload all audio elements
             preloadAudio();
             
             // Auto-start if specified in URL
             if (new URLSearchParams(window.location.search).get('autostart') === 'true') {
+                logDebug('Auto-starting playback due to autostart parameter');
                 startPlayback();
             }
         }
@@ -455,17 +623,36 @@
             const uniqueAudio = new Set();
             currentAudioQueue.forEach(item => uniqueAudio.add(item.audio));
             
+            logDebug(`Preloading ${uniqueAudio.size} audio files...`);
+            
             // Create audio elements for each file
+            let loadedCount = 0;
             uniqueAudio.forEach(audioFile => {
                 const audio = new Audio(`${audioPath}/${audioFile}.mp3`);
                 audio.preload = 'auto';
+                
+                // Track loading progress
+                audio.addEventListener('canplaythrough', () => {
+                    loadedCount++;
+                    if (loadedCount === uniqueAudio.size) {
+                        logDebug(`All ${loadedCount} audio files loaded successfully`, 'success');
+                    }
+                });
+                
+                // Handle errors
+                audio.addEventListener('error', (e) => {
+                    logDebug(`Error loading audio: ${audioFile}.mp3 - ${audio.error ? audio.error.message : 'Unknown error'}`, 'error');
+                });
+                
                 audioElements[audioFile] = audio;
             });
             
-            logDebug(`Preloaded ${uniqueAudio.size} audio files`);
+            logDebug(`Started preloading ${uniqueAudio.size} audio files`);
         }
         
         function startPlayback() {
+            logDebug('Starting experiment playback...');
+            
             // Hide start button
             startButton.style.display = 'none';
             
@@ -484,12 +671,28 @@
             currentAudioQueue.forEach(item => item.played = false);
             
             // Start playback
-            videoElement.play();
-            logDebug('Playback started');
+            videoElement.play()
+                .then(() => {
+                    logDebug('Video playback started successfully', 'success');
+                })
+                .catch(error => {
+                    logDebug(`Error starting video playback: ${error.message}`, 'error');
+                    // Show start button again if there's an error
+                    startButton.style.display = 'block';
+                });
         }
+        
+        // Last video time for debug logging
+        let lastLoggedTime = -1;
         
         function onTimeUpdate() {
             const currentTime = videoElement.currentTime;
+            
+            // Log current time every second for debugging
+            if (Math.floor(currentTime) > Math.floor(lastLoggedTime)) {
+                logDebug(`Video time: ${currentTime.toFixed(2)}s`);
+                lastLoggedTime = currentTime;
+            }
             
             // Check for audio events
             checkAudioEvents(currentTime);
@@ -507,7 +710,7 @@
                 if (Math.abs(currentTime - event.time) < 0.1 && !event.played) {
                     playAudio(event.audio);
                     event.played = true;
-                    logDebug(`Playing audio: ${event.audio} at ${currentTime.toFixed(2)}`);
+                    logDebug(`[AUDIO] Playing audio: "${event.audio}" at ${currentTime.toFixed(2)}s`, 'success');
                 }
             }
         }
@@ -522,7 +725,8 @@
             if (currentTime >= freezePoint.start && !isVideoFrozen) {
                 freezeVideo();
                 isVideoFrozen = true;
-                logDebug(`Freezing video at ${currentTime.toFixed(2)} until ${freezePoint.end}`);
+                const duration = freezePoint.end - freezePoint.start;
+                logDebug(`[FREEZE] Freezing video at ${currentTime.toFixed(2)}s until ${freezePoint.end}s (${duration.toFixed(1)}s duration)`, 'warn');
                 
                 // Schedule unfreezing
                 setTimeout(() => {
@@ -530,7 +734,7 @@
                         unfreezeVideo();
                         isVideoFrozen = false;
                         currentFreezeIndex++;
-                        logDebug(`Unfreezing video to continue at ${freezePoint.end}`);
+                        logDebug(`[UNFREEZE] Unfreezing video to continue at ${freezePoint.end}s`, 'success');
                         
                         // Set current time to end of freeze
                         videoElement.currentTime = freezePoint.end;
@@ -546,7 +750,10 @@
         
         function unfreezeVideo() {
             // Resume video playback
-            videoElement.play();
+            videoElement.play()
+                .catch(error => {
+                    logDebug(`Error resuming playback after freeze: ${error.message}`, 'error');
+                });
         }
         
         function playAudio(audioName) {
@@ -559,63 +766,60 @@
                 
                 // Play the audio
                 audio.play()
+                    .then(() => {
+                        // Successfully started playing
+                        logDebug(`Audio "${audioName}" started playing`);
+                    })
                     .catch(error => {
-                        logDebug(`Error playing audio ${audioName}: ${error.message}`);
+                        logDebug(`Error playing audio ${audioName}: ${error.message}`, 'error');
                     });
             } else {
-                logDebug(`Audio not found: ${audioName}`);
+                logDebug(`Audio not found: ${audioName}`, 'error');
             }
         }
         
         function onVideoEnded() {
-            logDebug('Video playback ended');
+            logDebug('Video playback ended', 'success');
             
             // Tell parent frame to move to next step if applicable
-            window.parent.postMessage({
-                type: 'nextFrame'
-            }, '*');
+            try {
+                window.parent.postMessage({
+                    type: 'nextFrame'
+                }, '*');
+                logDebug('Sent nextFrame message to parent');
+            } catch (err) {
+                logDebug(`Error sending message to parent: ${err.message}`, 'error');
+            }
         }
         
         function onMessageReceived(event) {
             if (event.data && event.data.type) {
+                logDebug(`Received message: ${event.data.type}`);
+                
                 switch (event.data.type) {
                     case 'play':
                         videoElement.play();
+                        logDebug('Received play command');
                         break;
                         
                     case 'pause':
                         videoElement.pause();
+                        logDebug('Received pause command');
                         break;
                         
                     case 'setCondition':
                         // Reload page with new condition
                         if (event.data.version && event.data.cb) {
+                            logDebug(`Received setCondition: version=${event.data.version}, cb=${event.data.cb}`);
                             const url = new URL(window.location);
                             url.searchParams.set('task', event.data.version.split('_')[0]);
                             url.searchParams.set('version', event.data.version.split('_')[1]);
                             url.searchParams.set('cb', event.data.cb);
+                            logDebug(`Redirecting to: ${url.toString()}`);
                             window.location.href = url.toString();
                         }
                         break;
                 }
-            }
-        }
-        
-        function logDebug(message) {
-            if (debugMode) {
-                const now = new Date();
-                const timestamp = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}.${now.getMilliseconds()}`;
-                
-                // Add to debug panel
-                const logEntry = document.createElement('div');
-                logEntry.textContent = `${timestamp} - ${message}`;
-                debugPanel.appendChild(logEntry);
-                
-                // Auto-scroll to bottom
-                debugPanel.scrollTop = debugPanel.scrollHeight;
-                
-                // Also log to console
-                console.log(`[Gazorp] ${message}`);
             }
         }
         
