@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gazorp Experiment Player</title>
+    <title>Gazorp Custom Experiment Player</title>
     <style>
         body {
             margin: 0;
             padding: 0;
             overflow: hidden;
             background-color: #000;
+            font-family: Arial, sans-serif;
         }
         .player-container {
             position: relative;
@@ -23,6 +24,12 @@
         #videoElement {
             max-width: 100%;
             max-height: 100%;
+            display: none; /* Hide the actual video element */
+        }
+        #canvasElement {
+            max-width: 100%;
+            max-height: 100%;
+            background-color: #000;
         }
         #startButton {
             position: absolute;
@@ -38,19 +45,82 @@
             cursor: pointer;
             z-index: 100;
         }
+        #loadingMessage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
+            text-align: center;
+        }
+        #controlBar {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            background-color: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 100;
+        }
+        #playPauseButton {
+            background-color: transparent;
+            border: none;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        #timeDisplay {
+            color: white;
+            margin-right: 10px;
+            font-size: 14px;
+            line-height: 24px;
+        }
+        #progressBar {
+            width: 300px;
+            height: 10px;
+            background-color: #333;
+            border-radius: 5px;
+            margin-top: 7px;
+            cursor: pointer;
+        }
+        #progressFill {
+            height: 100%;
+            background-color: #4CAF50;
+            border-radius: 5px;
+            width: 0%;
+        }
     </style>
 </head>
 <body>
     <div class="player-container" id="playerContainer">
-        <video id="videoElement" playsinline>
+        <!-- Hidden video element to load and decode the video -->
+        <video id="videoElement" preload="auto" crossorigin="anonymous">
             <source src="" type="video/mp4">
         </video>
+        
+        <!-- Canvas to display the video frames -->
+        <canvas id="canvasElement"></canvas>
+        
+        <!-- UI Elements -->
         <button id="startButton">Start Experiment</button>
+        <div id="loadingMessage">Loading video...</div>
+        
+        <!-- Control bar -->
+        <div id="controlBar" style="display: none;">
+            <button id="playPauseButton">❚❚</button>
+            <div id="timeDisplay">0:00 / 0:00</div>
+            <div id="progressBar">
+                <div id="progressFill"></div>
+            </div>
+        </div>
     </div>
 
     <script>
         // Main configuration
-        // Base URL for GitHub raw content
         const baseUrl = 'https://raw.githubusercontent.com/sociallearninglab/social_groups_lookit/main';
         const videoPath = `${baseUrl}/mp4`;
         const audioPath = `${baseUrl}/mp3`;
@@ -60,71 +130,106 @@
         
         // Elements
         const videoElement = document.getElementById('videoElement');
+        const canvasElement = document.getElementById('canvasElement');
         const startButton = document.getElementById('startButton');
+        const loadingMessage = document.getElementById('loadingMessage');
         const playerContainer = document.getElementById('playerContainer');
+        const controlBar = document.getElementById('controlBar');
+        const playPauseButton = document.getElementById('playPauseButton');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
+        
+        // Set up canvas context
+        const ctx = canvasElement.getContext('2d');
         
         // Audio elements cache
         const audioElements = {};
-        const audioTracker = {}; // Track audio durations
         
         // Experiment configuration
         const experimentVersions = ['group_CD', 'group_Cx', 'group_xD', 'pref_CD', 'pref_Cx', 'pref_xD'];
         const groupCounterbalances = ['01', '02', '05', '06', '09', '10', '13', '14'];
         const prefCounterbalances = ['01', '03', '05', '07', '09', '11', '13', '15'];
         
-        // Experiment state
+        // Player state
         let currentVersion;
         let currentCB;
         let isGroupTask;
         let factors;
-        let currentAudioQueue = [];
-        let freezePoints = [];
-        let currentFreezeIndex = 0;
-        let isVideoFrozen = false;
-        let currentScheduledTimeout = null;
-        let audioEndTimeouts = []; // Store timeout IDs to clear them if needed
+        let isPlaying = false;
+        let isFrozen = false;
+        let currentTime = 0;
+        let lastFrameTime = 0;
+        let videoDuration = 0;
+        let videoWidth = 0;
+        let videoHeight = 0;
+        let animationFrameId = null;
+        let freezeTimeline = []; // Array of {start, end} times to freeze the video
+        let audioTimeline = []; // Array of {time, audio, duration} to trigger audio
         
-        // Default audio durations in seconds (if not detected at runtime)
-        const defaultAudioDurations = {
-            "intro_gazoom": 6,
-            "intro_gazorps": 9,
-            "red_team_first": 3,
-            "blue_team_first": 3,
-            "red_team_second": 3,
-            "blue_team_second": 3,
-            "question_point_red": 4,
-            "question_point_blue": 4,
-            "question_point_kiki": 4,
-            "question_point_bubba": 4,
-            "incorrect_red": 6,
-            "incorrect_blue": 6,
-            "incorrect_kiki": 6,
-            "incorrect_bubba": 6,
-            "good_job": 1.5,
-            "fruits_intro": 6,
-            "kiki_first": 4,
-            "bubba_first": 4,
-            "kiki_second": 4,
-            "bubba_second": 4,
-            "intro_snacktime": 10,
-            "song_intro": 8
-        };
+        // Custom frozen state tracking
+        let activeFreezePoint = null;
+        let scheduledAudio = [];
         
-        // Default audio script template - this will be customized based on counterbalance factors
-        const audioScriptTemplate = {
-            // Base script shared by all versions
-            base: [
-                // Slide 1: Introduction
-                { time: 0, audio: "intro_gazoom", freeze_start: 4, freeze_end: 12.6 },
-                
-                // Slide 2: Team Introduction - Modified to have proper timing
-                { time: 12.6, audio: "intro_gazorps", freeze_start: 13, freeze_end: null, duration: 9 },
-                
-                // Remaining slides will be added dynamically based on factors
-            ]
-        };
+        // Log function
+        function logDebug(message) {
+            if (debugMode) {
+                console.log(`[Gazorp] ${message}`);
+            }
+        }
         
-        // Counterbalance factor mappings
+        // Initialize experiment
+        function initExperiment() {
+            logDebug('Initializing experiment...');
+            
+            // Get experiment parameters from URL or randomly assign
+            const params = new URLSearchParams(window.location.search);
+            
+            // Select version (group or pref + CD, Cx, or xD)
+            let taskType = params.get('task') || (Math.random() < 0.5 ? 'group' : 'pref');
+            let versionType = params.get('version') || ['CD', 'Cx', 'xD'][Math.floor(Math.random() * 3)];
+            currentVersion = `${taskType}_${versionType}`;
+            
+            // Is this a group task?
+            isGroupTask = taskType === 'group';
+            
+            // Select counterbalance
+            const validCBs = isGroupTask ? groupCounterbalances : prefCounterbalances;
+            currentCB = params.get('cb') || validCBs[Math.floor(Math.random() * validCBs.length)];
+            
+            // Get factors for this counterbalance
+            factors = cbFactors[taskType][currentCB];
+            
+            // Set video source using the correct file structure
+            const videoFolderName = `${versionType}_${taskType}`;
+            
+            let videoFileName;
+            if (versionType === 'CD') {
+                videoFileName = `${versionType}_${taskType}_CB${currentCB}.mp4`;
+            } else {
+                videoFileName = `${taskType}_${versionType}_CB${currentCB}.mp4`;
+            }
+            
+            const videoFilePath = `${videoPath}/${videoFolderName}/${videoFileName}`;
+            
+            // Set the video source
+            const sourceElement = videoElement.querySelector('source');
+            sourceElement.src = videoFilePath;
+            
+            logDebug(`Experiment setup: ${currentVersion}, CB${currentCB}`);
+            logDebug(`Video: ${videoFilePath}`);
+            
+            // Create freeze and audio timelines based on factors
+            createTimelines();
+            
+            // Set up event listeners
+            setupEventListeners();
+            
+            // Load video
+            videoElement.load();
+        }
+        
+        // Counterbalance factors
         const cbFactors = {
             group: {
                 '01': { predicted_fruit: 'Kiki', predicted_team: 'Red', fruit_left: 'Kiki', team_first: 'Red' },
@@ -148,217 +253,78 @@
             }
         };
         
-        // Log function
-        function logDebug(message) {
-            if (debugMode) {
-                console.log(`[Gazorp] ${message}`);
-            }
-        }
-        
-        // Initialize experiment
-        function initExperiment() {
-            // Get experiment parameters from URL or randomly assign
-            const params = new URLSearchParams(window.location.search);
+        // Create timelines based on factors
+        function createTimelines() {
+            // Clear existing timelines
+            freezeTimeline = [];
+            audioTimeline = [];
             
-            // Select version (group or pref + CD, Cx, or xD)
-            let taskType = params.get('task') || (Math.random() < 0.5 ? 'group' : 'pref');
-            let versionType = params.get('version') || ['CD', 'Cx', 'xD'][Math.floor(Math.random() * 3)];
-            currentVersion = `${taskType}_${versionType}`;
+            // Add intro freezes and audio
+            freezeTimeline.push({ start: 4, end: 12.6 }); // Initial freeze during intro
+            audioTimeline.push({ time: 0, audio: "intro_gazoom", duration: 6 });
+            audioTimeline.push({ time: 12.6, audio: "intro_gazorps", duration: 9 });
             
-            // Is this a group task?
-            isGroupTask = taskType === 'group';
-            
-            // Select counterbalance
-            const validCBs = isGroupTask ? groupCounterbalances : prefCounterbalances;
-            currentCB = params.get('cb') || validCBs[Math.floor(Math.random() * validCBs.length)];
-            
-            // Get factors for this counterbalance
-            factors = cbFactors[taskType][currentCB];
-            
-            // Set video source using the correct file structure based on the version
-            const videoFolderName = `${versionType}_${taskType}`;
-            
-            // All videos now use .mp4 format following conversion
-            let videoFileName;
-            
-            if (versionType === 'CD') {
-                // For CD files: CD_[taskType]_CB[cb].mp4
-                videoFileName = `${versionType}_${taskType}_CB${currentCB}.mp4`;
-            } else {
-                // For other files: [taskType]_[versionType]_CB[cb].mp4 (was .mov before conversion)
-                videoFileName = `${taskType}_${versionType}_CB${currentCB}.mp4`;
-            }
-            
-            const videoFilePath = `${videoPath}/${videoFolderName}/${videoFileName}`;
-            
-            // Set the video source
-            const sourceElement = videoElement.querySelector('source');
-            sourceElement.src = videoFilePath;
-            sourceElement.type = "video/mp4";
-            
-            // Log experiment setup
-            logDebug(`Experiment setup: ${currentVersion}, CB${currentCB}`);
-            logDebug(`Factors: ${JSON.stringify(factors)}`);
-            logDebug(`Video: ${videoFilePath}`);
-            
-            // Build the customized audio script for this condition
-            buildAudioScript();
-            
-            // Set up event listeners
-            setupEventListeners();
-            
-            // Load video
-            videoElement.load();
-        }
-        
-        function buildAudioScript() {
-            // Start with the base script
-            let script = [...audioScriptTemplate.base];
-            
-            // Add team introduction based on factors
-            // The intro_gazorps audio finishes at 21.6s (12.6 + 9s duration)
-            
-            const firstTeamStart = 22; // Start right after intro_gazorps ends
+            // Team introduction sequence
+            // Freeze ends at 24s while first team audio plays (starts at ~22s)
+            const firstTeamStart = 22; // After intro_gazorps finishes
             
             if (factors.team_first === 'Red') {
-                script.push(
-                    // First team audio
-                    { time: firstTeamStart, audio: "red_team_first", freeze_start: null, freeze_end: 24, duration: 3 },
-                    // Second team audio - starts after first team audio ends (~25s)
-                    { time: firstTeamStart + 3, audio: "blue_team_second", freeze_start: firstTeamStart + 3, freeze_end: null, duration: 3 }
-                );
+                audioTimeline.push({ time: firstTeamStart, audio: "red_team_first", duration: 3 });
+                audioTimeline.push({ time: firstTeamStart + 3, audio: "blue_team_second", duration: 3 });
             } else {
-                script.push(
-                    // First team audio
-                    { time: firstTeamStart, audio: "blue_team_first", freeze_start: null, freeze_end: 24, duration: 3 },
-                    // Second team audio - starts after first team audio ends (~25s)
-                    { time: firstTeamStart + 3, audio: "red_team_second", freeze_start: firstTeamStart + 3, freeze_end: null, duration: 3 }
-                );
+                audioTimeline.push({ time: firstTeamStart, audio: "blue_team_first", duration: 3 });
+                audioTimeline.push({ time: firstTeamStart + 3, audio: "red_team_second", duration: 3 });
             }
             
-            // Team questions - Both teams have questions at fixed time 29
-            // We'll freeze the video, play first team question, wait 5s, play incorrect,
-            // wait 1s, play second team question, wait 5s, play second incorrect
+            // Second freeze starts at 25s when second team audio plays
+            freezeTimeline.push({ start: 25, end: 28 });
             
-            const questionStart = 29;
+            // Team questions sequence at 29s
+            // This will be a long freeze with multiple audio events
+            freezeTimeline.push({ start: 29, end: 60 }); // Longer freeze to cover all questions
             
+            // Schedule question audio dynamically based on freezes
+            addQuestionSequence(29);
+            
+            // Add fruits intro
+            freezeTimeline.push({ start: 62, end: 72 });
+            audioTimeline.push({ time: 62, audio: "fruits_intro", duration: 6 });
+            
+            // Sort timelines by time
+            freezeTimeline.sort((a, b) => a.start - b.start);
+            audioTimeline.sort((a, b) => a.time - b.time);
+            
+            logDebug(`Created ${freezeTimeline.length} freeze points and ${audioTimeline.length} audio events`);
+        }
+        
+        // Add question sequence dynamically
+        function addQuestionSequence(startTime) {
             if (factors.fruit_left === 'Kiki') {
                 // Kiki (Red) team on left, Bubba (Blue) team on right
-                script.push(
-                    // First question (for left team)
-                    { 
-                        time: questionStart, 
-                        audio: "question_point_red", 
-                        freeze_start: questionStart, 
-                        freeze_end: null, 
-                        duration: 4,
-                        onEnd: () => {
-                            // Schedule incorrect after 5s gap
-                            setTimeout(() => {
-                                playAudio("incorrect_red");
-                                logDebug(`Playing incorrect_red audio 5s after question_point_red`);
-                                
-                                // Schedule second question 1s after incorrect_red ends (~6s duration)
-                                setTimeout(() => {
-                                    playAudio("question_point_blue");
-                                    logDebug(`Playing question_point_blue audio`);
-                                    
-                                    // Schedule second incorrect 5s after question_point_blue ends
-                                    setTimeout(() => {
-                                        playAudio("incorrect_blue");
-                                        logDebug(`Playing incorrect_blue audio`);
-                                        
-                                        // Unfreeze video after incorrect_blue ends (~6s duration)
-                                        setTimeout(() => {
-                                            if (isVideoFrozen) {
-                                                unfreezeVideo();
-                                                isVideoFrozen = false;
-                                                currentFreezeIndex++;
-                                                logDebug(`Unfreezing video after team questions`);
-                                            }
-                                        }, 6000);
-                                    }, 4000 + 5000); // question_blue duration + 5s gap
-                                }, 6000 + 1000); // incorrect_red duration + 1s gap
-                            }, 4000 + 5000); // question_red duration + 5s gap
-                        }
-                    }
-                );
+                audioTimeline.push({ time: startTime, audio: "question_point_red", duration: 4 });
+                audioTimeline.push({ time: startTime + 9, audio: "incorrect_red", duration: 6 });
+                audioTimeline.push({ time: startTime + 16, audio: "question_point_blue", duration: 4 });
+                audioTimeline.push({ time: startTime + 25, audio: "incorrect_blue", duration: 6 });
             } else {
                 // Bubba (Blue) team on left, Kiki (Red) team on right
-                script.push(
-                    // First question (for left team)
-                    { 
-                        time: questionStart, 
-                        audio: "question_point_blue", 
-                        freeze_start: questionStart, 
-                        freeze_end: null, 
-                        duration: 4,
-                        onEnd: () => {
-                            // Schedule incorrect after 5s gap
-                            setTimeout(() => {
-                                playAudio("incorrect_blue");
-                                logDebug(`Playing incorrect_blue audio 5s after question_point_blue`);
-                                
-                                // Schedule second question 1s after incorrect_blue ends (~6s duration)
-                                setTimeout(() => {
-                                    playAudio("question_point_red");
-                                    logDebug(`Playing question_point_red audio`);
-                                    
-                                    // Schedule second incorrect 5s after question_point_red ends
-                                    setTimeout(() => {
-                                        playAudio("incorrect_red");
-                                        logDebug(`Playing incorrect_red audio`);
-                                        
-                                        // Unfreeze video after incorrect_red ends (~6s duration)
-                                        setTimeout(() => {
-                                            if (isVideoFrozen) {
-                                                unfreezeVideo();
-                                                isVideoFrozen = false;
-                                                currentFreezeIndex++;
-                                                logDebug(`Unfreezing video after team questions`);
-                                            }
-                                        }, 6000);
-                                    }, 4000 + 5000); // question_red duration + 5s gap
-                                }, 6000 + 1000); // incorrect_blue duration + 1s gap
-                            }, 4000 + 5000); // question_blue duration + 5s gap
-                        }
-                    }
-                );
+                audioTimeline.push({ time: startTime, audio: "question_point_blue", duration: 4 });
+                audioTimeline.push({ time: startTime + 9, audio: "incorrect_blue", duration: 6 });
+                audioTimeline.push({ time: startTime + 16, audio: "question_point_red", duration: 4 });
+                audioTimeline.push({ time: startTime + 25, audio: "incorrect_red", duration: 6 });
             }
-            
-            // Add fruit introduction and remaining script...
-            // (I'm keeping this simpler for this fix, focusing on the initial timing issues)
-            script.push(
-                // Slide 4: Fruit Introduction
-                { time: 62, audio: "fruits_intro", freeze_start: 62, freeze_end: 72 }
-            );
-            
-            // Set the current audio queue
-            currentAudioQueue = [...script];
-            
-            // Extract freeze points (excluding those handled by callbacks)
-            freezePoints = script
-                .filter(item => item.freeze_start !== null && item.freeze_end !== null)
-                .map(item => ({ start: item.freeze_start, end: item.freeze_end }));
-            
-            // Sort by time
-            currentAudioQueue.sort((a, b) => a.time - b.time);
-            freezePoints.sort((a, b) => a.start - b.start);
-            
-            logDebug(`Prepared ${currentAudioQueue.length} audio events and ${freezePoints.length} freeze points`);
         }
         
         function setupEventListeners() {
             // Video events
             videoElement.addEventListener('loadedmetadata', onVideoLoaded);
-            videoElement.addEventListener('timeupdate', onTimeUpdate);
-            videoElement.addEventListener('ended', onVideoEnded);
             videoElement.addEventListener('error', onVideoError);
-            videoElement.addEventListener('play', () => logDebug('Video playback started'));
-            videoElement.addEventListener('pause', () => logDebug('Video playback paused'));
             
             // Start button
             startButton.addEventListener('click', startPlayback);
+            
+            // Controls
+            playPauseButton.addEventListener('click', togglePlayPause);
+            progressBar.addEventListener('click', seekVideo);
             
             // Message handlers for Lookit
             window.addEventListener('message', onMessageReceived);
@@ -367,27 +333,40 @@
             document.addEventListener('keydown', (event) => {
                 if (event.code === 'Space') {
                     event.preventDefault();
-                    if (videoElement.paused) {
-                        videoElement.play();
-                        logDebug('Video resumed via spacebar');
-                    } else {
-                        videoElement.pause();
-                        logDebug('Video paused via spacebar');
-                    }
+                    togglePlayPause();
                 }
             });
+            
+            // Window resize handler
+            window.addEventListener('resize', updateCanvasSize);
         }
         
         function onVideoError(e) {
             logDebug(`Video error: ${videoElement.error ? videoElement.error.message : 'Unknown error'}`);
-            logDebug(`Error code: ${videoElement.error ? videoElement.error.code : 'N/A'}`);
-            logDebug(`Current src: ${videoElement.currentSrc}`);
+            loadingMessage.textContent = `Error loading video: ${videoElement.error ? videoElement.error.code : 'Unknown error'}`;
         }
         
         function onVideoLoaded() {
-            logDebug('Video loaded, ready to play');
+            // Get video dimensions and duration
+            videoWidth = videoElement.videoWidth;
+            videoHeight = videoElement.videoHeight;
+            videoDuration = videoElement.duration;
             
-            // Create and preload all audio elements
+            logDebug(`Video loaded: ${videoWidth}x${videoHeight}, ${videoDuration.toFixed(2)}s`);
+            
+            // Set canvas size to match video
+            updateCanvasSize();
+            
+            // Hide loading message
+            loadingMessage.style.display = 'none';
+            
+            // Enable start button
+            startButton.disabled = false;
+            
+            // Format duration in time display
+            timeDisplay.textContent = `0:00 / ${formatTime(videoDuration)}`;
+            
+            // Preload audio files
             preloadAudio();
             
             // Auto-start if specified in URL
@@ -396,51 +375,88 @@
             }
         }
         
-        function preloadAudio() {
-            // Create a Set of unique audio files needed
-            const uniqueAudio = new Set();
-            currentAudioQueue.forEach(item => uniqueAudio.add(item.audio));
+        function updateCanvasSize() {
+            // Maintain aspect ratio while fitting in container
+            const container = playerContainer;
+            const containerWidth = container.clientWidth;
+            const containerHeight = container.clientHeight;
             
-            // Add required incorrect audios
+            let canvasWidth, canvasHeight;
+            
+            // If video dimensions are available, use them
+            if (videoWidth > 0 && videoHeight > 0) {
+                const aspectRatio = videoWidth / videoHeight;
+                
+                if (containerWidth / containerHeight > aspectRatio) {
+                    // Container is wider than video
+                    canvasHeight = containerHeight;
+                    canvasWidth = canvasHeight * aspectRatio;
+                } else {
+                    // Container is taller than video
+                    canvasWidth = containerWidth;
+                    canvasHeight = canvasWidth / aspectRatio;
+                }
+            } else {
+                // Default size if video dimensions not available
+                canvasWidth = containerWidth;
+                canvasHeight = containerHeight;
+            }
+            
+            // Set canvas size
+            canvasElement.width = videoWidth;
+            canvasElement.height = videoHeight;
+            canvasElement.style.width = `${canvasWidth}px`;
+            canvasElement.style.height = `${canvasHeight}px`;
+            
+            // If video is playing, draw current frame with new dimensions
+            if (videoElement.readyState >= 2) {
+                drawVideoFrame();
+            }
+        }
+        
+        function preloadAudio() {
+            // Get unique audio files from timeline
+            const uniqueAudio = new Set();
+            audioTimeline.forEach(item => uniqueAudio.add(item.audio));
+            
+            // Add required audio for questions
             uniqueAudio.add("incorrect_red");
             uniqueAudio.add("incorrect_blue");
             
-            // Create audio elements for each file
+            logDebug(`Preloading ${uniqueAudio.size} audio files...`);
+            
+            // Create audio elements
             uniqueAudio.forEach(audioFile => {
                 const audio = new Audio(`${audioPath}/${audioFile}.mp3`);
                 audio.preload = 'auto';
                 
-                // Track when audio can play through to get duration
+                // Track loading success
                 audio.addEventListener('canplaythrough', () => {
-                    audioTracker[audioFile] = audio.duration;
-                    logDebug(`Audio ${audioFile}.mp3 duration: ${audio.duration.toFixed(2)}s`);
+                    logDebug(`Audio loaded: ${audioFile}.mp3 (${audio.duration.toFixed(2)}s)`);
                 });
                 
                 // Track errors
                 audio.addEventListener('error', () => {
                     logDebug(`Error loading audio: ${audioFile}.mp3`);
-                    // Use default duration as fallback
-                    audioTracker[audioFile] = defaultAudioDurations[audioFile] || 3;
                 });
                 
                 audioElements[audioFile] = audio;
             });
-            
-            logDebug(`Preloading ${uniqueAudio.size} audio files`);
         }
         
         function startPlayback() {
             // Hide start button
             startButton.style.display = 'none';
             
-            // Reset state
-            videoElement.currentTime = 0;
-            currentFreezeIndex = 0;
-            isVideoFrozen = false;
+            // Show controls
+            controlBar.style.display = 'flex';
             
-            // Clear any existing timeouts
-            audioEndTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
-            audioEndTimeouts = [];
+            // Reset state
+            currentTime = 0;
+            lastFrameTime = 0;
+            isPlaying = true;
+            isFrozen = false;
+            activeFreezePoint = null;
             
             // Reset all audio elements
             Object.values(audioElements).forEach(audio => {
@@ -448,103 +464,154 @@
                 audio.currentTime = 0;
             });
             
-            // Reset played flags on audio queue
-            currentAudioQueue.forEach(item => item.played = false);
+            // Start animation loop
+            requestAnimationFrame(updatePlayer);
             
-            // Start playback
-            videoElement.play();
             logDebug('Playback started');
         }
         
-        // Last video time for debug logging
-        let lastLoggedTime = -1;
-        
-        function onTimeUpdate() {
-            const currentTime = videoElement.currentTime;
+        function togglePlayPause() {
+            isPlaying = !isPlaying;
             
-            // Log current time every second for debugging
-            if (Math.floor(currentTime) > Math.floor(lastLoggedTime)) {
-                logDebug(`Video time: ${currentTime.toFixed(2)}s`);
-                lastLoggedTime = currentTime;
+            // Update button text
+            playPauseButton.textContent = isPlaying ? '❚❚' : '▶';
+            
+            // If resuming, start animation loop again
+            if (isPlaying && !animationFrameId) {
+                lastFrameTime = performance.now();
+                requestAnimationFrame(updatePlayer);
             }
             
-            // Check for audio events
-            checkAudioEvents(currentTime);
+            logDebug(`Playback ${isPlaying ? 'resumed' : 'paused'}`);
+        }
+        
+        function seekVideo(e) {
+            // Calculate position relative to progress bar
+            const rect = progressBar.getBoundingClientRect();
+            const position = (e.clientX - rect.left) / rect.width;
+            
+            // Set new time
+            const newTime = position * videoDuration;
+            currentTime = Math.max(0, Math.min(newTime, videoDuration));
+            
+            // Seek video element to sync audio
+            videoElement.currentTime = currentTime;
+            
+            // Draw the frame at the new position
+            drawVideoFrame();
+            
+            // Update display
+            updateTimeDisplay();
+            
+            logDebug(`Seeked to ${currentTime.toFixed(2)}s`);
+        }
+        
+        function updatePlayer(timestamp) {
+            // Calculate time delta
+            if (!lastFrameTime) {
+                lastFrameTime = timestamp;
+            }
+            const deltaTime = (timestamp - lastFrameTime) / 1000; // in seconds
+            lastFrameTime = timestamp;
+            
+            // Only update time if playing and not frozen
+            if (isPlaying && !isFrozen) {
+                currentTime += deltaTime;
+                
+                // Check for end of video
+                if (currentTime >= videoDuration) {
+                    currentTime = videoDuration;
+                    isPlaying = false;
+                    playPauseButton.textContent = '▶';
+                    onVideoEnded();
+                }
+            }
             
             // Check for freeze points
-            checkFreezePoints(currentTime);
+            checkFreezePoints();
+            
+            // Check for audio events
+            checkAudioEvents();
+            
+            // Draw current frame
+            drawVideoFrame();
+            
+            // Update time display and progress bar
+            updateTimeDisplay();
+            
+            // Continue animation loop if playing
+            if (isPlaying || isFrozen) {
+                animationFrameId = requestAnimationFrame(updatePlayer);
+            } else {
+                animationFrameId = null;
+            }
         }
         
-        function checkAudioEvents(currentTime) {
-            // Find audio events that should play
-            for (let i = 0; i < currentAudioQueue.length; i++) {
-                const event = currentAudioQueue[i];
-                
-                // If we're within 0.1 second of the event time and the audio hasn't played yet
-                if (Math.abs(currentTime - event.time) < 0.1 && !event.played) {
-                    playAudioWithCallback(event.audio, event.onEnd);
-                    event.played = true;
-                    logDebug(`[AUDIO] Playing audio: "${event.audio}" at ${currentTime.toFixed(2)}s`);
-                    
-                    // If this audio has a duration and onEnd callback, schedule it
-                    if (event.duration && typeof event.onEnd === 'function') {
-                        const duration = audioTracker[event.audio] || event.duration;
-                        const timeoutId = setTimeout(() => {
-                            event.onEnd();
-                        }, duration * 1000);
-                        audioEndTimeouts.push(timeoutId);
+        function checkFreezePoints() {
+            // Check if we're currently in a freeze point
+            if (!activeFreezePoint) {
+                // Find if we've hit a new freeze point
+                for (let i = 0; i < freezeTimeline.length; i++) {
+                    const freezePoint = freezeTimeline[i];
+                    if (currentTime >= freezePoint.start && currentTime < freezePoint.end) {
+                        // Enter frozen state
+                        activeFreezePoint = freezePoint;
+                        isFrozen = true;
+                        logDebug(`[FREEZE] Video frozen at ${currentTime.toFixed(2)}s until ${freezePoint.end}s`);
+                        break;
                     }
                 }
-            }
-        }
-        
-        function checkFreezePoints(currentTime) {
-            // Skip if we're already at the end of freeze points
-            if (currentFreezeIndex >= freezePoints.length) return;
-            
-            const freezePoint = freezePoints[currentFreezeIndex];
-            
-            // If we've reached the start of a freeze point and we're not already frozen
-            if (currentTime >= freezePoint.start && !isVideoFrozen) {
-                freezeVideo();
-                isVideoFrozen = true;
-                logDebug(`[FREEZE] Freezing video at ${currentTime.toFixed(2)}s until ${freezePoint.end}s`);
-                
-                // If there is an end time, schedule unfreezing
-                if (freezePoint.end !== null) {
-                    setTimeout(() => {
-                        if (isVideoFrozen) {
-                            unfreezeVideo();
-                            isVideoFrozen = false;
-                            currentFreezeIndex++;
-                            logDebug(`[UNFREEZE] Unfreezing video to continue at ${freezePoint.end}s`);
-                            
-                            // Set current time to end of freeze
-                            videoElement.currentTime = freezePoint.end;
-                        }
-                    }, (freezePoint.end - freezePoint.start) * 1000);
+            } else {
+                // Check if we should exit freeze
+                if (currentTime >= activeFreezePoint.end) {
+                    // Exit frozen state
+                    isFrozen = false;
+                    logDebug(`[UNFREEZE] Video unfrozen at ${currentTime.toFixed(2)}s`);
+                    activeFreezePoint = null;
                 }
             }
         }
         
-        function freezeVideo() {
-            // Pause the video to freeze it
-            videoElement.pause();
+        function checkAudioEvents() {
+            // Check for audio events to trigger
+            audioTimeline.forEach(event => {
+                // If we've reached the time for this audio and it hasn't been played
+                if (currentTime >= event.time && !event.played) {
+                    playAudio(event.audio);
+                    event.played = true;
+                    logDebug(`[AUDIO] Playing "${event.audio}" at ${currentTime.toFixed(2)}s`);
+                }
+            });
         }
         
-        function unfreezeVideo() {
-            // Resume video playback
-            videoElement.play()
-                .catch(error => {
-                    logDebug(`Error resuming playback after freeze: ${error.message}`);
-                });
+        function drawVideoFrame() {
+            // Seek the video element to the current time
+            if (Math.abs(videoElement.currentTime - currentTime) > 0.1) {
+                videoElement.currentTime = currentTime;
+            }
+            
+            // Draw the current frame to canvas
+            if (videoElement.readyState >= 2) {
+                ctx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+            }
+        }
+        
+        function updateTimeDisplay() {
+            // Update time display
+            timeDisplay.textContent = `${formatTime(currentTime)} / ${formatTime(videoDuration)}`;
+            
+            // Update progress bar
+            const progress = (currentTime / videoDuration) * 100;
+            progressFill.style.width = `${progress}%`;
+        }
+        
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${minutes}:${secs.toString().padStart(2, '0')}`;
         }
         
         function playAudio(audioName) {
-            playAudioWithCallback(audioName, null);
-        }
-        
-        function playAudioWithCallback(audioName, callback) {
             // Get audio element
             const audio = audioElements[audioName];
             
@@ -552,19 +619,9 @@
                 // Reset to beginning
                 audio.currentTime = 0;
                 
-                // Add ended callback if provided
-                if (typeof callback === 'function') {
-                    const onEnded = () => {
-                        callback();
-                        audio.removeEventListener('ended', onEnded);
-                    };
-                    audio.addEventListener('ended', onEnded);
-                }
-                
                 // Play the audio
                 audio.play()
                     .then(() => {
-                        // Successfully started playing
                         logDebug(`Audio "${audioName}" started playing`);
                     })
                     .catch(error => {
@@ -591,28 +648,22 @@
         
         function onMessageReceived(event) {
             if (event.data && event.data.type) {
-                logDebug(`Received message: ${event.data.type}`);
-                
                 switch (event.data.type) {
                     case 'play':
-                        videoElement.play();
-                        logDebug('Received play command');
+                        if (!isPlaying) togglePlayPause();
                         break;
                         
                     case 'pause':
-                        videoElement.pause();
-                        logDebug('Received pause command');
+                        if (isPlaying) togglePlayPause();
                         break;
                         
                     case 'setCondition':
                         // Reload page with new condition
                         if (event.data.version && event.data.cb) {
-                            logDebug(`Received setCondition: version=${event.data.version}, cb=${event.data.cb}`);
                             const url = new URL(window.location);
                             url.searchParams.set('task', event.data.version.split('_')[0]);
                             url.searchParams.set('version', event.data.version.split('_')[1]);
                             url.searchParams.set('cb', event.data.cb);
-                            logDebug(`Redirecting to: ${url.toString()}`);
                             window.location.href = url.toString();
                         }
                         break;
@@ -625,3 +676,4 @@
     </script>
 </body>
 </html>
+
