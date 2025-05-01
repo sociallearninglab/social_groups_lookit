@@ -787,28 +787,6 @@
                 animationFrameId = null;
             }
         }
-            
-            // Check for freeze points
-            checkFreezePoints();
-            
-            // Check for audio events
-            checkAudioEvents();
-            
-            // Draw current frame - only if not frozen
-            if (!isFrozen) {
-                drawVideoFrame();
-            }
-            
-            // Update time display and progress bar
-            updateTimeDisplay();
-            
-            // Continue animation loop if playing
-            if (isPlaying || isFrozen) {
-                animationFrameId = requestAnimationFrame(updatePlayer);
-            } else {
-                animationFrameId = null;
-            }
-        }
         
         function checkFreezePoints() {
         // Only check for new freeze points if not already frozen
