@@ -24,7 +24,7 @@
         #videoElement {
             max-width: 100%;
             max-height: 100%;
-            display: none; /* Hide the actual video element */
+            display: none;
         }
         #canvasElement {
             max-width: 100%;
@@ -491,6 +491,49 @@
             // Window resize handler
             window.addEventListener('resize', updateCanvasSize);
         }
+
+        function calculateTotalDuration() {
+            let baseDuration = videoElement.duration;
+            let additionalTime = 0;
+            
+            // Calculate additional time from freezes
+            freezeTimeline.forEach(freeze => {
+                // For each freeze, add the difference between end and start
+                // This is the extra time the video will play
+                additionalTime += (freeze.end - freeze.start);
+            });
+            
+            return baseDuration + additionalTime;
+        }
+
+        function calculateVideoTime(playerTime) {
+            // This function converts player time (including freeze times)
+            // to video element time (excluding freeze times)
+            
+            let adjustedTime = playerTime;
+            let totalFreezeTime = 0;
+            
+            // Subtract freeze time before current point
+            for (let i = 0; i < freezeTimeline.length; i++) {
+                const freeze = freezeTimeline[i];
+                
+                if (playerTime > freeze.end) {
+                    // This freeze is completely before current time
+                    // Subtract the duration of the freeze
+                    totalFreezeTime += (freeze.end - freeze.start);
+                } else if (playerTime > freeze.start && playerTime <= freeze.end) {
+                    // We're inside this freeze point
+                    // Just use the start time of the freeze
+                    return freeze.start;
+                }
+            }
+            
+            // Subtract accumulated freeze time
+            adjustedTime -= totalFreezeTime;
+            
+            // Ensure we don't go below 0
+            return Math.max(0, adjustedTime);
+        }
         
         function onVideoError(e) {
             logDebug(`Video error: ${videoElement.error ? videoElement.error.message : 'Unknown error'}`);
@@ -501,9 +544,11 @@
             // Get video dimensions and duration
             videoWidth = videoElement.videoWidth;
             videoHeight = videoElement.videoHeight;
-            videoDuration = videoElement.duration;
             
-            logDebug(`Video loaded: ${videoWidth}x${videoHeight}, ${videoDuration.toFixed(2)}s`);
+            // Calculate the REAL duration including freeze time
+            videoDuration = calculateTotalDuration();
+            
+            logDebug(`Video loaded: ${videoWidth}x${videoHeight}, original: ${videoElement.duration.toFixed(2)}s, with freezes: ${videoDuration.toFixed(2)}s`);
             
             // Set canvas sizes
             canvasElement.width = videoWidth;
@@ -687,6 +732,7 @@
             logDebug(`Seeked to ${currentTime.toFixed(2)}s`);
         }
         
+        // These changes go into your updatePlayer function
         function updatePlayer(timestamp) {
             // Calculate time delta
             if (!lastFrameTime) {
@@ -697,8 +743,27 @@
             
             // Only update time if playing
             if (isPlaying) {
-                // Always update time - even if frozen, audio still plays
-                currentTime += deltaTime;
+                // If frozen, don't advance the video time, just the audio time
+                if (isFrozen) {
+                    // Just advance current time for audio playback
+                    currentTime += deltaTime;
+                    
+                    // Check if we should exit freeze
+                    if (currentTime >= activeFreezePoint.end) {
+                        // Exit frozen state
+                        exitFrozenState();
+                        logDebug(`[UNFREEZE] Video unfrozen at ${currentTime.toFixed(2)}s`);
+                    }
+                } else {
+                    // Normal playback - advance time
+                    currentTime += deltaTime;
+                    
+                    // Check for freeze points
+                    checkFreezePoints();
+                    
+                    // Update video frame
+                    drawVideoFrame();
+                }
                 
                 // Check for end of video
                 if (currentTime >= videoDuration) {
@@ -707,7 +772,21 @@
                     playPauseButton.textContent = '▶';
                     onVideoEnded();
                 }
+                
+                // Check for audio events
+                checkAudioEvents();
+                
+                // Update time display and progress bar
+                updateTimeDisplay();
             }
+            
+            // Continue animation loop if playing
+            if (isPlaying) {
+                animationFrameId = requestAnimationFrame(updatePlayer);
+            } else {
+                animationFrameId = null;
+            }
+        }
             
             // Check for freeze points
             checkFreezePoints();
@@ -732,32 +811,42 @@
         }
         
         function checkFreezePoints() {
-            // Check if we're currently in a freeze point
-            if (!isFrozen) {
-                // Find if we've hit a new freeze point
-                for (let i = 0; i < freezeTimeline.length; i++) {
-                    const freezePoint = freezeTimeline[i];
-                    if (currentTime >= freezePoint.start && currentTime < freezePoint.end) {
-                        // Enter frozen state
-                        activeFreezePoint = freezePoint;
-                        isFrozen = true;
-                        freezeFrameCaptured = false; // Reset freeze frame capture flag
-                        logDebug(`[FREEZE] Video frozen at ${currentTime.toFixed(2)}s until ${freezePoint.end}s`);
+        // Only check for new freeze points if not already frozen
+        if (!isFrozen) {
+            // Find if we've hit a new freeze point
+            for (let i = 0; i < freezeTimeline.length; i++) {
+                const freezePoint = freezeTimeline[i];
+                if (currentTime >= freezePoint.start && currentTime < freezePoint.end) {
+                    // Enter frozen state
+                    activeFreezePoint = freezePoint;
+                    isFrozen = true;
+                    freezeFrameCaptured = false; // Reset freeze frame capture flag
+                    logDebug(`[FREEZE] Video frozen at ${currentTime.toFixed(2)}s until ${freezePoint.end}s`);
+                    
+                    // Set the video to the exact freeze point start
+                    videoElement.currentTime = freezePoint.start;
+                    
+                    // Add a one-time event listener to capture the frame
+                    videoElement.addEventListener('seeked', function onSeeked() {
+                        // Remove the event listener to avoid multiple triggers
+                        videoElement.removeEventListener('seeked', onSeeked);
                         
-                        // Immediately capture the freeze frame
-                        captureAndDisplayFreezeFrame();
-                        break;
-                    }
-                }
-            } else {
-                // Check if we should exit freeze
-                if (currentTime >= activeFreezePoint.end) {
-                    // Exit frozen state
-                    exitFrozenState();
-                    logDebug(`[UNFREEZE] Video unfrozen at ${currentTime.toFixed(2)}s`);
+                        // Capture the frame and display it
+                        freezeCtx.drawImage(videoElement, 0, 0, videoWidth, videoHeight);
+                        
+                        // Show freeze canvas, hide normal canvas
+                        canvasElement.style.display = 'none';
+                        freezeCanvas.style.display = 'block';
+                        
+                        freezeFrameCaptured = true;
+                        logDebug(`[FREEZE] Frame captured at ${activeFreezePoint.start}s`);
+                    }, { once: true });
+                    
+                    break;
                 }
             }
         }
+    }
         
         function captureAndDisplayFreezeFrame() {
             // Make sure the video is at the correct frame
@@ -788,15 +877,18 @@
             isFrozen = false;
             activeFreezePoint = null;
             
-            // Hide freeze canvas, show main canvas
+            // Switch back to main canvas
             freezeCanvas.style.display = 'none';
             canvasElement.style.display = 'block';
             
-            // Make sure video is at the correct time
+            // Set video to current time
             videoElement.currentTime = currentTime;
             
-            // Draw current frame
-            drawVideoFrame();
+            // Ensure the frame is updated
+            videoElement.addEventListener('seeked', function onSeeked() {
+                videoElement.removeEventListener('seeked', onSeeked);
+                drawVideoFrame();
+            }, { once: true });
         }
         
         function checkAudioEvents() {
@@ -812,13 +904,16 @@
         }
         
         function drawVideoFrame() {
-            // Make sure video element is at current time
-            if (Math.abs(videoElement.currentTime - currentTime) > 0.1) {
-                videoElement.currentTime = currentTime;
-            }
-            
-            // Draw the current frame to canvas
+            // Only attempt to draw if the video is ready
             if (videoElement.readyState >= 2) {
+                // If we're not frozen, update the video time to match current time
+                if (!isFrozen && Math.abs(videoElement.currentTime - currentTime) > 0.1) {
+                    // Find the actual video time based on current playback time
+                    let adjustedTime = calculateVideoTime(currentTime);
+                    videoElement.currentTime = adjustedTime;
+                }
+                
+                // Draw frame
                 ctx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
             }
         }
