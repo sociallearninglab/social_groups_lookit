@@ -31,6 +31,14 @@
             max-height: 100%;
             background-color: #000;
         }
+        #freezeCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+        }
         #startButton {
             position: absolute;
             top: 50%;
@@ -105,6 +113,9 @@
         <!-- Canvas to display the video frames -->
         <canvas id="canvasElement"></canvas>
         
+        <!-- Canvas for freeze frames -->
+        <canvas id="freezeCanvas"></canvas>
+        
         <!-- UI Elements -->
         <button id="startButton">Start Experiment</button>
         <div id="loadingMessage">Loading video...</div>
@@ -131,6 +142,7 @@
         // Elements
         const videoElement = document.getElementById('videoElement');
         const canvasElement = document.getElementById('canvasElement');
+        const freezeCanvas = document.getElementById('freezeCanvas');
         const startButton = document.getElementById('startButton');
         const loadingMessage = document.getElementById('loadingMessage');
         const playerContainer = document.getElementById('playerContainer');
@@ -140,8 +152,9 @@
         const progressBar = document.getElementById('progressBar');
         const progressFill = document.getElementById('progressFill');
         
-        // Set up canvas context
+        // Set up canvas contexts
         const ctx = canvasElement.getContext('2d');
+        const freezeCtx = freezeCanvas.getContext('2d');
         
         // Audio elements cache
         const audioElements = {};
@@ -169,7 +182,7 @@
         
         // Custom frozen state tracking
         let activeFreezePoint = null;
-        let scheduledAudio = [];
+        let freezeFrameCaptured = false;
         
         // Log function
         function logDebug(message) {
@@ -259,51 +272,51 @@
             freezeTimeline = [];
             audioTimeline = [];
             
-            // These freeze points are based on the XML file
+            // These freeze points are based on the XML file - consistent across all versions
             freezeTimeline = [
                 { start: 4.0, end: 12.6 },     // Introduction freeze
                 { start: 13.0, end: 24.0 },    // Team introduction freeze
-                { start: 29.0, end: 34.0 },    // Team questions freeze (red team)
-                { start: 51.0, end: 56.0 },    // Team questions freeze (blue team)
+                { start: 29.0, end: 34.0 },    // Team questions freeze (first team)
+                { start: 51.0, end: 56.0 },    // Team questions freeze (second team)
                 { start: 62.0, end: 72.0 },    // Fruit introduction freeze
-                { start: 80.0, end: 89.0 },    // Fruit questions freeze (kiki)
-                { start: 95.0, end: 101.0 },   // Fruit questions freeze (bubba)
+                { start: 80.0, end: 89.0 },    // Fruit questions freeze (first fruit)
+                { start: 95.0, end: 101.0 },   // Fruit questions freeze (second fruit)
                 { start: 107.0, end: 136.0 },  // Snack time introduction freeze
-                { start: 138.0, end: 142.0 },  // Red team sequence freeze 1
-                { start: 158.0, end: 162.0 },  // Red team sequence freeze 2
-                { start: 172.0, end: 176.0 },  // Red team sequence freeze 3
-                { start: 208.0, end: 212.0 },  // Red team sequence freeze 4
-                { start: 236.0, end: 251.0 },  // Red team summary freeze
-                { start: 265.0, end: 269.0 },  // Blue team sequence freeze 1
-                { start: 283.0, end: 287.0 },  // Blue team sequence freeze 2
-                { start: 300.0, end: 304.0 },  // Blue team sequence freeze 3
-                { start: 320.0, end: 324.0 },  // Blue team sequence freeze 4
-                { start: 362.0, end: 372.0 },  // Blue team summary freeze
-                { start: 386.0, end: 401.0 },  // Final review freeze (red team)
-                { start: 411.0, end: 415.0 },  // Final review freeze (blue team)
+                { start: 138.0, end: 142.0 },  // First team sequence freeze 1
+                { start: 158.0, end: 162.0 },  // First team sequence freeze 2
+                { start: 172.0, end: 176.0 },  // First team sequence freeze 3
+                { start: 208.0, end: 212.0 },  // First team sequence freeze 4
+                { start: 236.0, end: 251.0 },  // First team summary freeze
+                { start: 265.0, end: 269.0 },  // Second team sequence freeze 1
+                { start: 283.0, end: 287.0 },  // Second team sequence freeze 2
+                { start: 300.0, end: 304.0 },  // Second team sequence freeze 3
+                { start: 320.0, end: 324.0 },  // Second team sequence freeze 4
+                { start: 362.0, end: 372.0 },  // Second team summary freeze
+                { start: 386.0, end: 401.0 },  // Final review freeze (first team)
+                { start: 411.0, end: 415.0 },  // Final review freeze (second team)
                 { start: 431.0, end: 436.0 },  // Test question freeze 1
                 { start: 456.0, end: 463.0 }   // Test question freeze 2
             ];
             
-            // Basic audio timeline
+            // Basic audio timeline consistent across versions
             const baseAudioTimeline = [
                 { time: 0.0, audio: "intro_gazoom", duration: 12.6 },
                 { time: 12.6, audio: "intro_gazorps", duration: 8.4 },
                 { time: 62.0, audio: "fruits_intro", duration: 10.0 },
                 { time: 107.0, audio: "intro_snacktime", duration: 16.0 },
                 { time: 123.0, audio: "song_intro", duration: 13.0 },
-                { time: 236.0, audio: "summary_red", duration: 15.0 },
-                { time: 372.0, audio: "summary_blue", duration: 15.0 },
                 { time: 397.0, audio: "transition_all", duration: 15.0 },
                 { time: 438.0, audio: "test_new_gazorp", duration: 5.0 },
                 { time: 443.0, audio: "test_lost_shirt", duration: 12.0 },
                 { time: 455.0, audio: "oh_wow", duration: 2.0 },
-                { time: 467.0, audio: "click_team_correct", duration: 5.0 },
                 { time: 473.0, audio: "so_question", duration: 4.0 },
                 { time: 477.0, audio: "why_team", duration: 2.0 }
             ];
             
-            // Add conditional audio based on team order
+            // Initialize audio timeline with base events
+            audioTimeline = [...baseAudioTimeline];
+            
+            // First team vs second team audio depending on team_first factor
             if (factors.team_first === 'Red') {
                 // Red team first
                 audioTimeline.push({ time: 21.0, audio: "red_team_first", duration: 3.0 });
@@ -312,14 +325,27 @@
                 audioTimeline.push({ time: 159.0, audio: "song_red_start", duration: 14.0 });
                 audioTimeline.push({ time: 182.0, audio: "song_red_start", duration: 14.0 });
                 audioTimeline.push({ time: 208.0, audio: "song_red_start", duration: 14.0 });
+                audioTimeline.push({ time: 236.0, audio: "summary_red", duration: 15.0 });
                 audioTimeline.push({ time: 260.0, audio: "transition_blue", duration: 5.0 });
                 audioTimeline.push({ time: 265.0, audio: "song_blue_start", duration: 14.0 });
                 audioTimeline.push({ time: 290.0, audio: "song_blue_start", duration: 14.0 });
                 audioTimeline.push({ time: 316.0, audio: "song_blue_start", duration: 14.0 });
                 audioTimeline.push({ time: 345.0, audio: "song_blue_start", duration: 14.0 });
+                audioTimeline.push({ time: 362.0, audio: "summary_blue", duration: 15.0 });
                 audioTimeline.push({ time: 412.0, audio: "review_red", duration: 4.0 });
                 audioTimeline.push({ time: 425.0, audio: "review_blue", duration: 4.0 });
-                audioTimeline.push({ time: 479.0, audio: "red_team", duration: 2.0 });
+                
+                // Add count audio - Red Team first
+                audioTimeline.push({ time: 149.0, audio: "count_red_one", duration: 3.0 });
+                audioTimeline.push({ time: 174.0, audio: "count_red_two", duration: 3.0 });
+                audioTimeline.push({ time: 197.0, audio: "count_red_three", duration: 3.0 });
+                audioTimeline.push({ time: 223.0, audio: "count_red_four", duration: 4.0 });
+                
+                // Then Blue Team 
+                audioTimeline.push({ time: 280.0, audio: "count_blue_one", duration: 4.0 });
+                audioTimeline.push({ time: 305.0, audio: "count_blue_two", duration: 3.0 });
+                audioTimeline.push({ time: 331.0, audio: "count_blue_three", duration: 4.0 });
+                audioTimeline.push({ time: 360.0, audio: "count_blue_four", duration: 3.0 });
             } else {
                 // Blue team first
                 audioTimeline.push({ time: 21.0, audio: "blue_team_first", duration: 3.0 });
@@ -328,18 +354,32 @@
                 audioTimeline.push({ time: 159.0, audio: "song_blue_start", duration: 14.0 });
                 audioTimeline.push({ time: 182.0, audio: "song_blue_start", duration: 14.0 });
                 audioTimeline.push({ time: 208.0, audio: "song_blue_start", duration: 14.0 });
+                audioTimeline.push({ time: 236.0, audio: "summary_blue", duration: 15.0 });
                 audioTimeline.push({ time: 260.0, audio: "transition_red", duration: 5.0 });
                 audioTimeline.push({ time: 265.0, audio: "song_red_start", duration: 14.0 });
                 audioTimeline.push({ time: 290.0, audio: "song_red_start", duration: 14.0 });
                 audioTimeline.push({ time: 316.0, audio: "song_red_start", duration: 14.0 });
                 audioTimeline.push({ time: 345.0, audio: "song_red_start", duration: 14.0 });
+                audioTimeline.push({ time: 362.0, audio: "summary_red", duration: 15.0 });
                 audioTimeline.push({ time: 412.0, audio: "review_blue", duration: 4.0 });
                 audioTimeline.push({ time: 425.0, audio: "review_red", duration: 4.0 });
-                audioTimeline.push({ time: 479.0, audio: "blue_team", duration: 2.0 });
+                
+                // Add count audio - Blue Team first
+                audioTimeline.push({ time: 149.0, audio: "count_blue_one", duration: 3.0 });
+                audioTimeline.push({ time: 174.0, audio: "count_blue_two", duration: 3.0 });
+                audioTimeline.push({ time: 197.0, audio: "count_blue_three", duration: 3.0 });
+                audioTimeline.push({ time: 223.0, audio: "count_blue_four", duration: 4.0 });
+                
+                // Then Red Team 
+                audioTimeline.push({ time: 280.0, audio: "count_red_one", duration: 4.0 });
+                audioTimeline.push({ time: 305.0, audio: "count_red_two", duration: 3.0 });
+                audioTimeline.push({ time: 331.0, audio: "count_red_three", duration: 4.0 });
+                audioTimeline.push({ time: 360.0, audio: "count_red_four", duration: 3.0 });
             }
             
-            // Add fruit audio based on fruit order
+            // Add fruit audio based on left_fruit factor
             if (factors.fruit_left === 'Kiki') {
+                // Kiki on left, Bubba on right
                 audioTimeline.push({ time: 72.0, audio: "kiki_first", duration: 5.0 });
                 audioTimeline.push({ time: 77.0, audio: "bubba_second", duration: 3.0 });
                 audioTimeline.push({ time: 80.0, audio: "question_click_kiki", duration: 5.0 });
@@ -347,6 +387,7 @@
                 audioTimeline.push({ time: 95.0, audio: "question_click_bubba", duration: 5.0 });
                 audioTimeline.push({ time: 95.0, audio: "incorrect_bubba", duration: 6.0 });
             } else {
+                // Bubba on left, Kiki on right
                 audioTimeline.push({ time: 72.0, audio: "bubba_first", duration: 5.0 });
                 audioTimeline.push({ time: 77.0, audio: "kiki_second", duration: 3.0 });
                 audioTimeline.push({ time: 80.0, audio: "question_click_bubba", duration: 5.0 });
@@ -355,7 +396,22 @@
                 audioTimeline.push({ time: 95.0, audio: "incorrect_kiki", duration: 6.0 });
             }
             
-            // Add question audio based on experiment type and conditions
+            // Team questions sequence depends on team_first and fruit_left
+            if (factors.team_first === 'Red') {
+                // Red first, so Red on left
+                audioTimeline.push({ time: 29.0, audio: "question_click_red", duration: 5.0 });
+                audioTimeline.push({ time: 34.0, audio: "incorrect_red", duration: 13.0 });
+                audioTimeline.push({ time: 47.0, audio: "question_click_blue", duration: 4.0 });
+                audioTimeline.push({ time: 56.0, audio: "incorrect_blue", duration: 6.0 });
+            } else {
+                // Blue first, so Blue on left
+                audioTimeline.push({ time: 29.0, audio: "question_click_blue", duration: 5.0 });
+                audioTimeline.push({ time: 34.0, audio: "incorrect_blue", duration: 13.0 });
+                audioTimeline.push({ time: 47.0, audio: "question_click_red", duration: 4.0 });
+                audioTimeline.push({ time: 56.0, audio: "incorrect_red", duration: 6.0 });
+            }
+            
+            // Add experiment type specific audio
             if (isGroupTask) {
                 // For infer_group, we ask about fruit and infer team
                 if (factors.predicted_fruit === 'Kiki') {
@@ -364,6 +420,13 @@
                     audioTimeline.push({ time: 457.0, audio: "question_like_what_bubba", duration: 5.0 });
                 }
                 audioTimeline.push({ time: 462.0, audio: "click_fruit", duration: 5.0 });
+                
+                // Final team answer
+                if (factors.predicted_team === 'Red') {
+                    audioTimeline.push({ time: 479.0, audio: "red_team", duration: 2.0 });
+                } else {
+                    audioTimeline.push({ time: 479.0, audio: "blue_team", duration: 2.0 });
+                }
             } else {
                 // For infer_pref, we ask about team and infer fruit
                 if (factors.predicted_team === 'Red') {
@@ -372,24 +435,17 @@
                     audioTimeline.push({ time: 457.0, audio: "question_team_blue", duration: 5.0 });
                 }
                 audioTimeline.push({ time: 462.0, audio: "click_team", duration: 5.0 });
+                audioTimeline.push({ time: 467.0, audio: "click_team_correct", duration: 5.0 });
+                
+                // Final fruit answer
+                if (factors.predicted_fruit === 'Kiki') {
+                    audioTimeline.push({ time: 479.0, audio: "kiki", duration: 1.0 });
+                } else {
+                    audioTimeline.push({ time: 479.0, audio: "bubba", duration: 1.0 });
+                }
             }
             
-            // Team questions sequence
-            if (factors.fruit_left === 'Kiki') {
-                // Kiki (Red) team on left, Bubba (Blue) team on right
-                audioTimeline.push({ time: 29.0, audio: "question_click_red", duration: 5.0 });
-                audioTimeline.push({ time: 34.0, audio: "incorrect_red", duration: 13.0 });
-                audioTimeline.push({ time: 47.0, audio: "question_click_blue", duration: 4.0 });
-                audioTimeline.push({ time: 56.0, audio: "incorrect_blue", duration: 6.0 });
-            } else {
-                // Bubba (Blue) team on left, Kiki (Red) team on right
-                audioTimeline.push({ time: 29.0, audio: "question_click_blue", duration: 5.0 });
-                audioTimeline.push({ time: 34.0, audio: "incorrect_blue", duration: 13.0 });
-                audioTimeline.push({ time: 47.0, audio: "question_click_red", duration: 4.0 });
-                audioTimeline.push({ time: 56.0, audio: "incorrect_red", duration: 6.0 });
-            }
-            
-            // Add kiki/bubba sounds throughout
+            // Add kiki/bubba sounds throughout - times from XML
             const fruitSoundTimes = [
                 148.0, 152.0, 173.0, 177.0, 179.0, 196.0, 200.0, 202.0, 204.0, 222.0, 227.0, 229.0, 231.0, 
                 233.0, 251.0, 253.0, 256.0, 258.0, 279.0, 284.0, 304.0, 308.0, 310.0, 330.0, 335.0, 337.0, 
@@ -397,39 +453,11 @@
                 423.0, 429.0, 431.0, 434.0, 436.0, 472.0
             ];
             
-            // Add fruit sounds based on condition
+            // Add fruit sounds based on task and predicted fruit
             fruitSoundTimes.forEach(time => {
-                if (isGroupTask) {
-                    // In infer_group task
-                    if (factors.predicted_fruit === 'Kiki') {
-                        audioTimeline.push({ time: time, audio: "kiki", duration: 1.0 });
-                    } else {
-                        audioTimeline.push({ time: time, audio: "bubba", duration: 1.0 });
-                    }
-                } else {
-                    // In infer_pref task
-                    if (factors.predicted_fruit === 'Kiki') {
-                        audioTimeline.push({ time: time, audio: "kiki", duration: 1.0 });
-                    } else {
-                        audioTimeline.push({ time: time, audio: "bubba", duration: 1.0 });
-                    }
-                }
+                const predictedFruit = factors.predicted_fruit === 'Kiki' ? "kiki" : "bubba";
+                audioTimeline.push({ time: time, audio: predictedFruit, duration: 1.0 });
             });
-            
-            // Add count audio - Red Team
-            audioTimeline.push({ time: 149.0, audio: "count_red_one", duration: 3.0 });
-            audioTimeline.push({ time: 174.0, audio: "count_red_two", duration: 3.0 });
-            audioTimeline.push({ time: 197.0, audio: "count_red_three", duration: 3.0 });
-            audioTimeline.push({ time: 223.0, audio: "count_red_four", duration: 4.0 });
-            
-            // Add count audio - Blue Team
-            audioTimeline.push({ time: 280.0, audio: "count_blue_one", duration: 4.0 });
-            audioTimeline.push({ time: 305.0, audio: "count_blue_two", duration: 3.0 });
-            audioTimeline.push({ time: 331.0, audio: "count_blue_three", duration: 4.0 });
-            audioTimeline.push({ time: 360.0, audio: "count_blue_four", duration: 3.0 });
-            
-            // Add base audio timeline
-            audioTimeline = audioTimeline.concat(baseAudioTimeline);
             
             // Sort audio timeline by time
             audioTimeline.sort((a, b) => a.time - b.time);
@@ -477,7 +505,13 @@
             
             logDebug(`Video loaded: ${videoWidth}x${videoHeight}, ${videoDuration.toFixed(2)}s`);
             
-            // Set canvas size to match video
+            // Set canvas sizes
+            canvasElement.width = videoWidth;
+            canvasElement.height = videoHeight;
+            freezeCanvas.width = videoWidth;
+            freezeCanvas.height = videoHeight;
+            
+            // Update display sizes
             updateCanvasSize();
             
             // Hide loading message
@@ -525,12 +559,12 @@
                 canvasHeight = containerHeight;
             }
             
-            // Set canvas size
-            canvasElement.width = videoWidth;
-            canvasElement.height = videoHeight;
+            // Apply sizes to display elements
             canvasElement.style.width = `${canvasWidth}px`;
             canvasElement.style.height = `${canvasHeight}px`;
-            
+            freezeCanvas.style.width = `${canvasWidth}px`;
+            freezeCanvas.style.height = `${canvasHeight}px`;
+
             // If video is playing, draw current frame with new dimensions
             if (videoElement.readyState >= 2) {
                 drawVideoFrame();
@@ -545,6 +579,8 @@
             // Add required audio for questions
             uniqueAudio.add("incorrect_red");
             uniqueAudio.add("incorrect_blue");
+            uniqueAudio.add("kiki");
+            uniqueAudio.add("bubba");
             
             logDebug(`Preloading ${uniqueAudio.size} audio files...`);
             
@@ -580,6 +616,7 @@
             isPlaying = true;
             isFrozen = false;
             activeFreezePoint = null;
+            freezeFrameCaptured = false;
             
             // Reset all audio elements
             Object.values(audioElements).forEach(audio => {
@@ -591,6 +628,9 @@
             audioTimeline.forEach(event => {
                 event.played = false;
             });
+            
+            // Hide freeze canvas
+            freezeCanvas.style.display = 'none';
             
             // Start animation loop
             requestAnimationFrame(updatePlayer);
@@ -622,6 +662,12 @@
             const newTime = position * videoDuration;
             currentTime = Math.max(0, Math.min(newTime, videoDuration));
             
+            // Reset freeze state
+            isFrozen = false;
+            activeFreezePoint = null;
+            freezeFrameCaptured = false;
+            freezeCanvas.style.display = 'none';
+            
             // Seek video element to sync audio
             videoElement.currentTime = currentTime;
             
@@ -630,10 +676,6 @@
             
             // Update display
             updateTimeDisplay();
-            
-            // Reset freeze state
-            isFrozen = false;
-            activeFreezePoint = null;
             
             // Reset audio played flags for any audio after the current time
             audioTimeline.forEach(event => {
@@ -653,7 +695,7 @@
             const deltaTime = (timestamp - lastFrameTime) / 1000; // in seconds
             lastFrameTime = timestamp;
             
-            // Only update time if playing and not frozen
+            // Only update time if playing
             if (isPlaying) {
                 // Always update time - even if frozen, audio still plays
                 currentTime += deltaTime;
@@ -673,8 +715,10 @@
             // Check for audio events
             checkAudioEvents();
             
-            // Draw current frame
-            drawVideoFrame();
+            // Draw current frame - only if not frozen
+            if (!isFrozen) {
+                drawVideoFrame();
+            }
             
             // Update time display and progress bar
             updateTimeDisplay();
@@ -689,7 +733,7 @@
         
         function checkFreezePoints() {
             // Check if we're currently in a freeze point
-            if (!activeFreezePoint) {
+            if (!isFrozen) {
                 // Find if we've hit a new freeze point
                 for (let i = 0; i < freezeTimeline.length; i++) {
                     const freezePoint = freezeTimeline[i];
@@ -697,7 +741,11 @@
                         // Enter frozen state
                         activeFreezePoint = freezePoint;
                         isFrozen = true;
+                        freezeFrameCaptured = false; // Reset freeze frame capture flag
                         logDebug(`[FREEZE] Video frozen at ${currentTime.toFixed(2)}s until ${freezePoint.end}s`);
+                        
+                        // Immediately capture the freeze frame
+                        captureAndDisplayFreezeFrame();
                         break;
                     }
                 }
@@ -705,11 +753,50 @@
                 // Check if we should exit freeze
                 if (currentTime >= activeFreezePoint.end) {
                     // Exit frozen state
-                    isFrozen = false;
+                    exitFrozenState();
                     logDebug(`[UNFREEZE] Video unfrozen at ${currentTime.toFixed(2)}s`);
-                    activeFreezePoint = null;
                 }
             }
+        }
+        
+        function captureAndDisplayFreezeFrame() {
+            // Make sure the video is at the correct frame
+            videoElement.currentTime = activeFreezePoint.start;
+            
+            // Function to capture frame once video is ready
+            const captureFrame = () => {
+                // Draw video frame to freeze canvas
+                freezeCtx.drawImage(videoElement, 0, 0, freezeCanvas.width, freezeCanvas.height);
+                
+                // Hide main canvas, show freeze canvas
+                canvasElement.style.display = 'none';
+                freezeCanvas.style.display = 'block';
+                
+                freezeFrameCaptured = true;
+                
+                // Remove the event listener to avoid multiple captures
+                videoElement.removeEventListener('seeked', captureFrame);
+                
+                logDebug(`[FREEZE] Frame captured at ${activeFreezePoint.start}s`);
+            };
+            
+            // Add event listener for when seeking is complete
+            videoElement.addEventListener('seeked', captureFrame, { once: true });
+        }
+        
+        function exitFrozenState() {
+            isFrozen = false;
+            activeFreezePoint = null;
+            
+            // Hide freeze canvas, show main canvas
+            freezeCanvas.style.display = 'none';
+            canvasElement.style.display = 'block';
+            
+            // Make sure video is at the correct time
+            videoElement.currentTime = currentTime;
+            
+            // Draw current frame
+            drawVideoFrame();
         }
         
         function checkAudioEvents() {
@@ -725,17 +812,9 @@
         }
         
         function drawVideoFrame() {
-            // If we're frozen, use the frame at the freeze point start
-            if (isFrozen && activeFreezePoint) {
-                // Ensure video is at the freeze start frame
-                if (Math.abs(videoElement.currentTime - activeFreezePoint.start) > 0.1) {
-                    videoElement.currentTime = activeFreezePoint.start;
-                }
-            } else {
-                // Otherwise seek to current time
-                if (Math.abs(videoElement.currentTime - currentTime) > 0.1) {
-                    videoElement.currentTime = currentTime;
-                }
+            // Make sure video element is at current time
+            if (Math.abs(videoElement.currentTime - currentTime) > 0.1) {
+                videoElement.currentTime = currentTime;
             }
             
             // Draw the current frame to canvas
