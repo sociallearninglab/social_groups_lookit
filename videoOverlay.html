@@ -506,34 +506,6 @@
             return baseDuration + additionalTime;
         }
 
-        function calculateVideoTime(playerTime) {
-            // This function converts player time (including freeze times)
-            // to video element time (excluding freeze times)
-            
-            let adjustedTime = playerTime;
-            let totalFreezeTime = 0;
-            
-            // Subtract freeze time before current point
-            for (let i = 0; i < freezeTimeline.length; i++) {
-                const freeze = freezeTimeline[i];
-                
-                if (playerTime > freeze.end) {
-                    // This freeze is completely before current time
-                    // Subtract the duration of the freeze
-                    totalFreezeTime += (freeze.end - freeze.start);
-                } else if (playerTime > freeze.start && playerTime <= freeze.end) {
-                    // We're inside this freeze point
-                    // Just use the start time of the freeze
-                    return freeze.start;
-                }
-            }
-            
-            // Subtract accumulated freeze time
-            adjustedTime -= totalFreezeTime;
-            
-            // Ensure we don't go below 0
-            return Math.max(0, adjustedTime);
-        }
         
         function onVideoError(e) {
             logDebug(`Video error: ${videoElement.error ? videoElement.error.message : 'Unknown error'}`);
@@ -570,6 +542,11 @@
             
             // Preload audio files
             preloadAudio();
+            
+            // Initialize all freeze points with a videoTimeAtFreeze property
+            freezeTimeline.forEach(freezePoint => {
+                freezePoint.videoTimeAtFreeze = freezePoint.start;
+            });
             
             // Auto-start if specified in URL
             if (new URLSearchParams(window.location.search).get('autostart') === 'true') {
@@ -743,27 +720,9 @@
             
             // Only update time if playing
             if (isPlaying) {
-                // If frozen, don't advance the video time, just the audio time
-                if (isFrozen) {
-                    // Just advance current time for audio playback
-                    currentTime += deltaTime;
-                    
-                    // Check if we should exit freeze
-                    if (currentTime >= activeFreezePoint.end) {
-                        // Exit frozen state
-                        exitFrozenState();
-                        logDebug(`[UNFREEZE] Video unfrozen at ${currentTime.toFixed(2)}s`);
-                    }
-                } else {
-                    // Normal playback - advance time
-                    currentTime += deltaTime;
-                    
-                    // Check for freeze points
-                    checkFreezePoints();
-                    
-                    // Update video frame
-                    drawVideoFrame();
-                }
+                // Always advance the player time for both normal and frozen states
+                // This ensures audio timing works properly
+                currentTime += deltaTime;
                 
                 // Check for end of video
                 if (currentTime >= videoDuration) {
@@ -773,7 +732,27 @@
                     onVideoEnded();
                 }
                 
-                // Check for audio events
+                if (isFrozen) {
+                    // When frozen, check if we should exit freeze
+                    if (currentTime >= activeFreezePoint.end) {
+                        // Exit frozen state
+                        exitFrozenState();
+                        logDebug(`[UNFREEZE] Video unfrozen at ${currentTime.toFixed(2)}s`);
+                    }
+                } else {
+                    // In normal playback:
+                    // 1. Check if we need to enter a freeze state
+                    checkFreezePoints();
+                    
+                    // 2. If we're still not frozen after the check, advance the video frame
+                    if (!isFrozen) {
+                        // Let the video element progress at normal speed
+                        // The browser will automatically advance it between frames
+                        drawVideoFrame();
+                    }
+                }
+                
+                // Check for audio events (regardless of frozen state)
                 checkAudioEvents();
                 
                 // Update time display and progress bar
@@ -789,27 +768,24 @@
         }
         
         function checkFreezePoints() {
-        // Only check for new freeze points if not already frozen
-        if (!isFrozen) {
-            // Find if we've hit a new freeze point
-            for (let i = 0; i < freezeTimeline.length; i++) {
-                const freezePoint = freezeTimeline[i];
-                if (currentTime >= freezePoint.start && currentTime < freezePoint.end) {
-                    // Enter frozen state
-                    activeFreezePoint = freezePoint;
-                    isFrozen = true;
-                    freezeFrameCaptured = false; // Reset freeze frame capture flag
-                    logDebug(`[FREEZE] Video frozen at ${currentTime.toFixed(2)}s until ${freezePoint.end}s`);
-                    
-                    // Set the video to the exact freeze point start
-                    videoElement.currentTime = freezePoint.start;
-                    
-                    // Add a one-time event listener to capture the frame
-                    videoElement.addEventListener('seeked', function onSeeked() {
-                        // Remove the event listener to avoid multiple triggers
-                        videoElement.removeEventListener('seeked', onSeeked);
+            // Only check for new freeze points if not already frozen
+            if (!isFrozen) {
+                // Find if we've hit a new freeze point
+                for (let i = 0; i < freezeTimeline.length; i++) {
+                    const freezePoint = freezeTimeline[i];
+                    if (currentTime >= freezePoint.start && currentTime < freezePoint.end) {
+                        // Enter frozen state
+                        activeFreezePoint = freezePoint;
+                        isFrozen = true;
                         
-                        // Capture the frame and display it
+                        // Store the exact video time we're at when freezing
+                        // This is the time we'll continue from when unfreezing
+                        activeFreezePoint.videoTimeAtFreeze = videoElement.currentTime;
+                        
+                        freezeFrameCaptured = false; // Reset freeze frame capture flag
+                        logDebug(`[FREEZE] Video frozen at ${currentTime.toFixed(2)}s, video time: ${activeFreezePoint.videoTimeAtFreeze.toFixed(2)}s, until ${freezePoint.end}s`);
+                        
+                        // Capture the current frame
                         freezeCtx.drawImage(videoElement, 0, 0, videoWidth, videoHeight);
                         
                         // Show freeze canvas, hide normal canvas
@@ -817,14 +793,13 @@
                         freezeCanvas.style.display = 'block';
                         
                         freezeFrameCaptured = true;
-                        logDebug(`[FREEZE] Frame captured at ${activeFreezePoint.start}s`);
-                    }, { once: true });
-                    
-                    break;
+                        logDebug(`[FREEZE] Frame captured at current position`);
+                        
+                        break;
+                    }
                 }
             }
         }
-    }
         
         function captureAndDisplayFreezeFrame() {
             // Make sure the video is at the correct frame
@@ -852,6 +827,10 @@
         }
         
         function exitFrozenState() {
+            // Store the video time we need to continue from
+            const continueFromTime = activeFreezePoint.videoTimeAtFreeze;
+            
+            // Now exit frozen state
             isFrozen = false;
             activeFreezePoint = null;
             
@@ -859,8 +838,10 @@
             freezeCanvas.style.display = 'none';
             canvasElement.style.display = 'block';
             
-            // Set video to current time
-            videoElement.currentTime = currentTime;
+            // Set video to continue exactly from where it froze
+            videoElement.currentTime = continueFromTime;
+            
+            logDebug(`[UNFREEZE] Continuing from video time: ${continueFromTime.toFixed(2)}s`);
             
             // Ensure the frame is updated
             videoElement.addEventListener('seeked', function onSeeked() {
@@ -884,14 +865,7 @@
         function drawVideoFrame() {
             // Only attempt to draw if the video is ready
             if (videoElement.readyState >= 2) {
-                // If we're not frozen, update the video time to match current time
-                if (!isFrozen && Math.abs(videoElement.currentTime - currentTime) > 0.1) {
-                    // Find the actual video time based on current playback time
-                    let adjustedTime = calculateVideoTime(currentTime);
-                    videoElement.currentTime = adjustedTime;
-                }
-                
-                // Draw frame
+                // Draw current frame from the video element
                 ctx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
             }
         }
