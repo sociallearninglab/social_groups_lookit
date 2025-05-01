@@ -253,65 +253,188 @@
             }
         };
         
-        // Create timelines based on factors
+        // Create timelines based on XML data and condition factors
         function createTimelines() {
             // Clear existing timelines
             freezeTimeline = [];
             audioTimeline = [];
             
-            // Add intro freezes and audio
-            freezeTimeline.push({ start: 4, end: 12.6 }); // Initial freeze during intro
-            audioTimeline.push({ time: 0, audio: "intro_gazoom", duration: 6 });
-            audioTimeline.push({ time: 12.6, audio: "intro_gazorps", duration: 9 });
+            // These freeze points are based on the XML file
+            freezeTimeline = [
+                { start: 4.0, end: 12.6 },     // Introduction freeze
+                { start: 13.0, end: 24.0 },    // Team introduction freeze
+                { start: 29.0, end: 34.0 },    // Team questions freeze (red team)
+                { start: 51.0, end: 56.0 },    // Team questions freeze (blue team)
+                { start: 62.0, end: 72.0 },    // Fruit introduction freeze
+                { start: 80.0, end: 89.0 },    // Fruit questions freeze (kiki)
+                { start: 95.0, end: 101.0 },   // Fruit questions freeze (bubba)
+                { start: 107.0, end: 136.0 },  // Snack time introduction freeze
+                { start: 138.0, end: 142.0 },  // Red team sequence freeze 1
+                { start: 158.0, end: 162.0 },  // Red team sequence freeze 2
+                { start: 172.0, end: 176.0 },  // Red team sequence freeze 3
+                { start: 208.0, end: 212.0 },  // Red team sequence freeze 4
+                { start: 236.0, end: 251.0 },  // Red team summary freeze
+                { start: 265.0, end: 269.0 },  // Blue team sequence freeze 1
+                { start: 283.0, end: 287.0 },  // Blue team sequence freeze 2
+                { start: 300.0, end: 304.0 },  // Blue team sequence freeze 3
+                { start: 320.0, end: 324.0 },  // Blue team sequence freeze 4
+                { start: 362.0, end: 372.0 },  // Blue team summary freeze
+                { start: 386.0, end: 401.0 },  // Final review freeze (red team)
+                { start: 411.0, end: 415.0 },  // Final review freeze (blue team)
+                { start: 431.0, end: 436.0 },  // Test question freeze 1
+                { start: 456.0, end: 463.0 }   // Test question freeze 2
+            ];
             
-            // Team introduction sequence
-            // Freeze ends at 24s while first team audio plays (starts at ~22s)
-            const firstTeamStart = 22; // After intro_gazorps finishes
+            // Basic audio timeline
+            const baseAudioTimeline = [
+                { time: 0.0, audio: "intro_gazoom", duration: 12.6 },
+                { time: 12.6, audio: "intro_gazorps", duration: 8.4 },
+                { time: 62.0, audio: "fruits_intro", duration: 10.0 },
+                { time: 107.0, audio: "intro_snacktime", duration: 16.0 },
+                { time: 123.0, audio: "song_intro", duration: 13.0 },
+                { time: 236.0, audio: "summary_red", duration: 15.0 },
+                { time: 372.0, audio: "summary_blue", duration: 15.0 },
+                { time: 397.0, audio: "transition_all", duration: 15.0 },
+                { time: 438.0, audio: "test_new_gazorp", duration: 5.0 },
+                { time: 443.0, audio: "test_lost_shirt", duration: 12.0 },
+                { time: 455.0, audio: "oh_wow", duration: 2.0 },
+                { time: 467.0, audio: "click_team_correct", duration: 5.0 },
+                { time: 473.0, audio: "so_question", duration: 4.0 },
+                { time: 477.0, audio: "why_team", duration: 2.0 }
+            ];
             
+            // Add conditional audio based on team order
             if (factors.team_first === 'Red') {
-                audioTimeline.push({ time: firstTeamStart, audio: "red_team_first", duration: 3 });
-                audioTimeline.push({ time: firstTeamStart + 3, audio: "blue_team_second", duration: 3 });
+                // Red team first
+                audioTimeline.push({ time: 21.0, audio: "red_team_first", duration: 3.0 });
+                audioTimeline.push({ time: 25.0, audio: "blue_team_second", duration: 3.0 });
+                audioTimeline.push({ time: 136.0, audio: "song_red_start", duration: 14.0 });
+                audioTimeline.push({ time: 159.0, audio: "song_red_start", duration: 14.0 });
+                audioTimeline.push({ time: 182.0, audio: "song_red_start", duration: 14.0 });
+                audioTimeline.push({ time: 208.0, audio: "song_red_start", duration: 14.0 });
+                audioTimeline.push({ time: 260.0, audio: "transition_blue", duration: 5.0 });
+                audioTimeline.push({ time: 265.0, audio: "song_blue_start", duration: 14.0 });
+                audioTimeline.push({ time: 290.0, audio: "song_blue_start", duration: 14.0 });
+                audioTimeline.push({ time: 316.0, audio: "song_blue_start", duration: 14.0 });
+                audioTimeline.push({ time: 345.0, audio: "song_blue_start", duration: 14.0 });
+                audioTimeline.push({ time: 412.0, audio: "review_red", duration: 4.0 });
+                audioTimeline.push({ time: 425.0, audio: "review_blue", duration: 4.0 });
+                audioTimeline.push({ time: 479.0, audio: "red_team", duration: 2.0 });
             } else {
-                audioTimeline.push({ time: firstTeamStart, audio: "blue_team_first", duration: 3 });
-                audioTimeline.push({ time: firstTeamStart + 3, audio: "red_team_second", duration: 3 });
+                // Blue team first
+                audioTimeline.push({ time: 21.0, audio: "blue_team_first", duration: 3.0 });
+                audioTimeline.push({ time: 25.0, audio: "red_team_second", duration: 3.0 });
+                audioTimeline.push({ time: 136.0, audio: "song_blue_start", duration: 14.0 });
+                audioTimeline.push({ time: 159.0, audio: "song_blue_start", duration: 14.0 });
+                audioTimeline.push({ time: 182.0, audio: "song_blue_start", duration: 14.0 });
+                audioTimeline.push({ time: 208.0, audio: "song_blue_start", duration: 14.0 });
+                audioTimeline.push({ time: 260.0, audio: "transition_red", duration: 5.0 });
+                audioTimeline.push({ time: 265.0, audio: "song_red_start", duration: 14.0 });
+                audioTimeline.push({ time: 290.0, audio: "song_red_start", duration: 14.0 });
+                audioTimeline.push({ time: 316.0, audio: "song_red_start", duration: 14.0 });
+                audioTimeline.push({ time: 345.0, audio: "song_red_start", duration: 14.0 });
+                audioTimeline.push({ time: 412.0, audio: "review_blue", duration: 4.0 });
+                audioTimeline.push({ time: 425.0, audio: "review_red", duration: 4.0 });
+                audioTimeline.push({ time: 479.0, audio: "blue_team", duration: 2.0 });
             }
             
-            // Second freeze starts at 25s when second team audio plays
-            freezeTimeline.push({ start: 25, end: 28 });
+            // Add fruit audio based on fruit order
+            if (factors.fruit_left === 'Kiki') {
+                audioTimeline.push({ time: 72.0, audio: "kiki_first", duration: 5.0 });
+                audioTimeline.push({ time: 77.0, audio: "bubba_second", duration: 3.0 });
+                audioTimeline.push({ time: 80.0, audio: "question_click_kiki", duration: 5.0 });
+                audioTimeline.push({ time: 85.0, audio: "incorrect_kiki", duration: 10.0 });
+                audioTimeline.push({ time: 95.0, audio: "question_click_bubba", duration: 5.0 });
+                audioTimeline.push({ time: 95.0, audio: "incorrect_bubba", duration: 6.0 });
+            } else {
+                audioTimeline.push({ time: 72.0, audio: "bubba_first", duration: 5.0 });
+                audioTimeline.push({ time: 77.0, audio: "kiki_second", duration: 3.0 });
+                audioTimeline.push({ time: 80.0, audio: "question_click_bubba", duration: 5.0 });
+                audioTimeline.push({ time: 85.0, audio: "incorrect_bubba", duration: 10.0 });
+                audioTimeline.push({ time: 95.0, audio: "question_click_kiki", duration: 5.0 });
+                audioTimeline.push({ time: 95.0, audio: "incorrect_kiki", duration: 6.0 });
+            }
             
-            // Team questions sequence at 29s
-            // This will be a long freeze with multiple audio events
-            freezeTimeline.push({ start: 29, end: 60 }); // Longer freeze to cover all questions
+            // Add question audio based on experiment type and conditions
+            if (isGroupTask) {
+                // For infer_group, we ask about fruit and infer team
+                if (factors.predicted_fruit === 'Kiki') {
+                    audioTimeline.push({ time: 457.0, audio: "question_like_what_kiki", duration: 5.0 });
+                } else {
+                    audioTimeline.push({ time: 457.0, audio: "question_like_what_bubba", duration: 5.0 });
+                }
+                audioTimeline.push({ time: 462.0, audio: "click_fruit", duration: 5.0 });
+            } else {
+                // For infer_pref, we ask about team and infer fruit
+                if (factors.predicted_team === 'Red') {
+                    audioTimeline.push({ time: 457.0, audio: "question_team_red", duration: 5.0 });
+                } else {
+                    audioTimeline.push({ time: 457.0, audio: "question_team_blue", duration: 5.0 });
+                }
+                audioTimeline.push({ time: 462.0, audio: "click_team", duration: 5.0 });
+            }
             
-            // Schedule question audio dynamically based on freezes
-            addQuestionSequence(29);
+            // Team questions sequence
+            if (factors.fruit_left === 'Kiki') {
+                // Kiki (Red) team on left, Bubba (Blue) team on right
+                audioTimeline.push({ time: 29.0, audio: "question_click_red", duration: 5.0 });
+                audioTimeline.push({ time: 34.0, audio: "incorrect_red", duration: 13.0 });
+                audioTimeline.push({ time: 47.0, audio: "question_click_blue", duration: 4.0 });
+                audioTimeline.push({ time: 56.0, audio: "incorrect_blue", duration: 6.0 });
+            } else {
+                // Bubba (Blue) team on left, Kiki (Red) team on right
+                audioTimeline.push({ time: 29.0, audio: "question_click_blue", duration: 5.0 });
+                audioTimeline.push({ time: 34.0, audio: "incorrect_blue", duration: 13.0 });
+                audioTimeline.push({ time: 47.0, audio: "question_click_red", duration: 4.0 });
+                audioTimeline.push({ time: 56.0, audio: "incorrect_red", duration: 6.0 });
+            }
             
-            // Add fruits intro
-            freezeTimeline.push({ start: 62, end: 72 });
-            audioTimeline.push({ time: 62, audio: "fruits_intro", duration: 6 });
+            // Add kiki/bubba sounds throughout
+            const fruitSoundTimes = [
+                148.0, 152.0, 173.0, 177.0, 179.0, 196.0, 200.0, 202.0, 204.0, 222.0, 227.0, 229.0, 231.0, 
+                233.0, 251.0, 253.0, 256.0, 258.0, 279.0, 284.0, 304.0, 308.0, 310.0, 330.0, 335.0, 337.0, 
+                339.0, 359.0, 363.0, 365.0, 367.0, 369.0, 387.0, 389.0, 392.0, 394.0, 416.0, 418.0, 421.0, 
+                423.0, 429.0, 431.0, 434.0, 436.0, 472.0
+            ];
             
-            // Sort timelines by time
-            freezeTimeline.sort((a, b) => a.start - b.start);
+            // Add fruit sounds based on condition
+            fruitSoundTimes.forEach(time => {
+                if (isGroupTask) {
+                    // In infer_group task
+                    if (factors.predicted_fruit === 'Kiki') {
+                        audioTimeline.push({ time: time, audio: "kiki", duration: 1.0 });
+                    } else {
+                        audioTimeline.push({ time: time, audio: "bubba", duration: 1.0 });
+                    }
+                } else {
+                    // In infer_pref task
+                    if (factors.predicted_fruit === 'Kiki') {
+                        audioTimeline.push({ time: time, audio: "kiki", duration: 1.0 });
+                    } else {
+                        audioTimeline.push({ time: time, audio: "bubba", duration: 1.0 });
+                    }
+                }
+            });
+            
+            // Add count audio - Red Team
+            audioTimeline.push({ time: 149.0, audio: "count_red_one", duration: 3.0 });
+            audioTimeline.push({ time: 174.0, audio: "count_red_two", duration: 3.0 });
+            audioTimeline.push({ time: 197.0, audio: "count_red_three", duration: 3.0 });
+            audioTimeline.push({ time: 223.0, audio: "count_red_four", duration: 4.0 });
+            
+            // Add count audio - Blue Team
+            audioTimeline.push({ time: 280.0, audio: "count_blue_one", duration: 4.0 });
+            audioTimeline.push({ time: 305.0, audio: "count_blue_two", duration: 3.0 });
+            audioTimeline.push({ time: 331.0, audio: "count_blue_three", duration: 4.0 });
+            audioTimeline.push({ time: 360.0, audio: "count_blue_four", duration: 3.0 });
+            
+            // Add base audio timeline
+            audioTimeline = audioTimeline.concat(baseAudioTimeline);
+            
+            // Sort audio timeline by time
             audioTimeline.sort((a, b) => a.time - b.time);
             
             logDebug(`Created ${freezeTimeline.length} freeze points and ${audioTimeline.length} audio events`);
-        }
-        
-        // Add question sequence dynamically
-        function addQuestionSequence(startTime) {
-            if (factors.fruit_left === 'Kiki') {
-                // Kiki (Red) team on left, Bubba (Blue) team on right
-                audioTimeline.push({ time: startTime, audio: "question_point_red", duration: 4 });
-                audioTimeline.push({ time: startTime + 9, audio: "incorrect_red", duration: 6 });
-                audioTimeline.push({ time: startTime + 16, audio: "question_point_blue", duration: 4 });
-                audioTimeline.push({ time: startTime + 25, audio: "incorrect_blue", duration: 6 });
-            } else {
-                // Bubba (Blue) team on left, Kiki (Red) team on right
-                audioTimeline.push({ time: startTime, audio: "question_point_blue", duration: 4 });
-                audioTimeline.push({ time: startTime + 9, audio: "incorrect_blue", duration: 6 });
-                audioTimeline.push({ time: startTime + 16, audio: "question_point_red", duration: 4 });
-                audioTimeline.push({ time: startTime + 25, audio: "incorrect_red", duration: 6 });
-            }
         }
         
         function setupEventListeners() {
@@ -464,6 +587,11 @@
                 audio.currentTime = 0;
             });
             
+            // Reset timeline events played status
+            audioTimeline.forEach(event => {
+                event.played = false;
+            });
+            
             // Start animation loop
             requestAnimationFrame(updatePlayer);
             
@@ -503,6 +631,17 @@
             // Update display
             updateTimeDisplay();
             
+            // Reset freeze state
+            isFrozen = false;
+            activeFreezePoint = null;
+            
+            // Reset audio played flags for any audio after the current time
+            audioTimeline.forEach(event => {
+                if (event.time >= currentTime) {
+                    event.played = false;
+                }
+            });
+            
             logDebug(`Seeked to ${currentTime.toFixed(2)}s`);
         }
         
@@ -515,7 +654,8 @@
             lastFrameTime = timestamp;
             
             // Only update time if playing and not frozen
-            if (isPlaying && !isFrozen) {
+            if (isPlaying) {
+                // Always update time - even if frozen, audio still plays
                 currentTime += deltaTime;
                 
                 // Check for end of video
@@ -585,9 +725,17 @@
         }
         
         function drawVideoFrame() {
-            // Seek the video element to the current time
-            if (Math.abs(videoElement.currentTime - currentTime) > 0.1) {
-                videoElement.currentTime = currentTime;
+            // If we're frozen, use the frame at the freeze point start
+            if (isFrozen && activeFreezePoint) {
+                // Ensure video is at the freeze start frame
+                if (Math.abs(videoElement.currentTime - activeFreezePoint.start) > 0.1) {
+                    videoElement.currentTime = activeFreezePoint.start;
+                }
+            } else {
+                // Otherwise seek to current time
+                if (Math.abs(videoElement.currentTime - currentTime) > 0.1) {
+                    videoElement.currentTime = currentTime;
+                }
             }
             
             // Draw the current frame to canvas
