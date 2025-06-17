@@ -34,13 +34,14 @@ function generateProtocol(child, pastSessions) {
     }
 
     const parts = namingString.split('_');
-    const fruitPresentedFirst = parts[3]; 
-    const teamPresentedFirst = parts[4];  
+    const fruitPresentedFirst = parts[3];
+    const teamPresentedFirst = parts[4];
 
-    // Store teamPresentedFirst on child object for access in generateProperties
-    child.study = child.study || {}; // ***** THIS LINE IS ADDED/MODIFIED FOR SAFETY *****
-    child.study.conditions = child.study.conditions || {}; 
+    // Store dynamic conditions on child object for access in generateProperties
+    child.study = child.study || {};
+    child.study.conditions = child.study.conditions || {};
     child.study.conditions.teamPresentedFirst = teamPresentedFirst;
+    child.study.conditions.fruitPresentedFirst = fruitPresentedFirst; // Added for fruit why question
 
 
     // --- 2. Determine Specific Stimuli Filenames & Dynamic Logic ---
@@ -51,14 +52,16 @@ function generateProtocol(child, pastSessions) {
     const fruitsTestBgImgFile = fruitPresentedFirst === "Kiki" ? "fruits_kiki.png" : "fruits_bubba.png";
 
     const snackTimeVidFileBase = `${selectedMainStudyType}_${selectedConditionType}_${selectedCbKey}`;
-    const snackTimeVid = snackTimeVidFileBase; 
+    // MODIFICATION: Create variables for Part 1 and Part 2 of the snack time video
+    const snackTimeVidP1 = `${snackTimeVidFileBase}_P1`;
+    const snackTimeVidP2 = `${snackTimeVidFileBase}_P2`;
     const snackTimeTestBgImgFile = `${snackTimeVidFileBase}_test.png`;
 
     const fruitChoiceQAudio = fruitPresentedFirst === "Kiki" ? "question_like_what_kiki" : "question_like_what_bubba";
     let teamChoiceQAudio;
     if (selectedConditionType === "pref") {
         teamChoiceQAudio = teamPresentedFirst === "Red" ? "question_team_red_pref" : "question_team_blue_pref";
-    } else { 
+    } else {
         teamChoiceQAudio = teamPresentedFirst === "Red" ? "question_team_red" : "question_team_blue";
     }
 
@@ -79,10 +82,10 @@ function generateProtocol(child, pastSessions) {
     let tqr_correctChoice, tqr_leftCorrect, tqr_leftFeedback, tqr_rightFeedback;
     let tqb_correctChoice, tqb_leftCorrect, tqb_leftFeedback, tqb_rightFeedback;
 
-    if (teamPresentedFirst === "Red") { 
+    if (teamPresentedFirst === "Red") {
         tqr_correctChoice = 'left-choice'; tqr_leftCorrect = true; tqr_leftFeedback = "good_job"; tqr_rightFeedback = "incorrect_red";
         tqb_correctChoice = 'right-choice'; tqb_leftCorrect = false; tqb_leftFeedback = "incorrect_blue"; tqb_rightFeedback = "good_job";
-    } else { 
+    } else {
         tqr_correctChoice = 'right-choice'; tqr_leftCorrect = false; tqr_leftFeedback = "incorrect_red"; tqr_rightFeedback = "good_job";
         tqb_correctChoice = 'left-choice'; tqb_leftCorrect = true; tqb_leftFeedback = "good_job"; tqb_rightFeedback = "incorrect_blue";
     }
@@ -90,37 +93,37 @@ function generateProtocol(child, pastSessions) {
     let tqk_correctChoice, tqk_leftCorrect, tqk_leftFeedback, tqk_rightFeedback;
     let tqbuba_correctChoice, tqbuba_leftCorrect, tqbuba_leftFeedback, tqbuba_rightFeedback;
 
-    if (fruitPresentedFirst === "Kiki") { 
+    if (fruitPresentedFirst === "Kiki") {
         tqk_correctChoice = 'left-choice'; tqk_leftCorrect = true; tqk_leftFeedback = "good_job"; tqk_rightFeedback = "incorrect_kiki";
         tqbuba_correctChoice = 'right-choice'; tqbuba_leftCorrect = false; tqbuba_leftFeedback = "incorrect_bubba"; tqbuba_rightFeedback = "good_job";
-    } else { 
+    } else {
         tqk_correctChoice = 'right-choice'; tqk_leftCorrect = false; tqk_leftFeedback = "incorrect_kiki"; tqk_rightFeedback = "good_job";
         tqbuba_correctChoice = 'left-choice'; tqbuba_leftCorrect = true; tqbuba_leftFeedback = "good_job"; tqbuba_rightFeedback = "incorrect_bubba";
     }
 
-    const videoParentTextBlockCss = { 
+    const videoParentTextBlockCss = {
         'background-color': '#f8f3bf', 'width': '50vw', 'height': '16vh', 'margin': 'auto',
         'bottom': '2vh', 'right': '0', 'left': '0', 'position': 'fixed', 'padding': '10px 25px',
         'text-align': 'center', 'display': 'table-cell', 'vertical-align': 'middle', 'border-radius': '15px'
     };
-    const videoParentTextBlockObj = { 
-        'text': '<b>FOR PARENTS</b>: \n\nPlease allow your child to watch the video carefully.',
+    const videoParentTextBlockObj = {
+        'text': '<b>FOR PARENTS</b>: \n\nPlease allow your child to watch the video carefully and press "Next" to continue if it pops up.',
         'fontSize': 'x-large',
         'css': videoParentTextBlockCss
     };
-    const questionParentTextBlockObj = { 
+    const questionParentTextBlockObj = {
         'text': '<b>FOR PARENTS</b>: \n\nPlease allow your child to answer on their own and avoid guiding or influencing their thoughts about the video.'
     };
-     const whyQuestionParentTextBlockObj = { 
+     const whyQuestionParentTextBlockObj = {
          'text': '<b>FOR PARENTS</b>: \n\nPlease allow your child to say their answer out loud. Once your child has given their answer, you may click Next to continue.'
     };
 
     const frames = {
-        'video-config': { 
+        'video-config': { /* ... same ... */
             'kind': 'exp-video-config',
             'troubleshootingIntro': 'If you\'re having any trouble getting your webcam set up, please feel free to contact us for help!'
         },
-        'video-consent': { 
+        'video-consent': { /* ... same ... */
             'kind': 'exp-lookit-video-consent', 'template': 'consent_005', 'PIName': 'Researcher Name',
             'institution': 'Stanford University', 'PIContact': 'researcher@stanford.edu',
             'purpose': 'Investigating how children understand social group dynamics.',
@@ -132,7 +135,7 @@ function generateProtocol(child, pastSessions) {
             'include_databrary': true, 'gdpr': false,
             'research_rights_statement': 'For questions about your rights as a research participant, you may contact the Stanford IRB.'
         },
-        'positioning': { 
+        'positioning': { /* ... same ... */
             'kind': 'exp-video-config-quality', 'title': 'Positioning',
             'introText': 'Let\'s get you and your child positioned comfortably.', 'showRecordMenu': false, 'requireTestVideo': false,
             'completedItemText': 'Got it!',
@@ -143,9 +146,9 @@ function generateProtocol(child, pastSessions) {
             ],
             'nextButtonText': 'We\'re ready to start!', 'showPreviousButton': true, 'requireItemConfirmation': true, 'recordingInstructionText': ''
         },
-        'start-recording': { 'kind': 'exp-lookit-start-recording', 'imageAnimation': 'spin', 'displayFullscreen': true },
-        'stop-recording': { 'kind': 'exp-lookit-stop-recording', 'imageAnimation': 'spin', 'displayFullscreen': true },
-        'exit-survey': { 
+        'start-recording': { /* ... same ... */ 'kind': 'exp-lookit-start-recording', 'imageAnimation': 'spin', 'displayFullscreen': true },
+        'stop-recording': { /* ... same ... */ 'kind': 'exp-lookit-stop-recording', 'imageAnimation': 'spin', 'displayFullscreen': true },
+        'exit-survey': { /* ... same ... */
             'kind': 'exp-lookit-exit-survey',
             'debriefing': {
                 'title': 'Thank you for participating!',
@@ -157,7 +160,8 @@ function generateProtocol(child, pastSessions) {
                 ]
             }
         },
-        'intro-gazoom-fixed': { 
+        
+        'intro-gazoom-fixed': { /* ... same ... */
             'kind': 'exp-lookit-video',
             'video': { 'top': 0, 'left': 0, 'width': 100, 'source': 'intro_gazoom', 'loop': false },
             'backgroundColor': 'black', 'autoProceed': true,
@@ -165,15 +169,16 @@ function generateProtocol(child, pastSessions) {
             'showPreviousButton': false, 'showReplayButton': true, 'doRecording': false,
             'baseDir': 'https://raw.githubusercontent.com/sociallearninglab/social_groups_lookit/main', 'videoTypes': ['mp4']
         },
-        'intro-gazorps-stim': { 
+        'intro-gazorps-stim': { /* ... same ... */
             'kind': 'exp-lookit-video',
             'video': { 'top': 0, 'left': 0, 'width': 100, 'source': introGazorpsVid, 'loop': false },
             'backgroundColor': 'black', 'autoProceed': true,
             'parentTextBlock': videoParentTextBlockObj,
-            'showPreviousButton': false, 'showReplayButton': true, 'doRecording': false, 
+            'showPreviousButton': false, 'showReplayButton': true, 'doRecording': false,
             'baseDir': 'https://raw.githubusercontent.com/sociallearninglab/social_groups_lookit/main', 'videoTypes': ['mp4']
         },
-        'test-question-red': { 
+
+        'test-question-red': {
             'kind': 'exp-lookit-images-audio',
             'images': [
                 { "id": 'background', "src": gazorpsTestBgImgFile, "left": 0, "width": 100, "top": 0, "height": 100, 'maximizeDisplay': true, "nonChoiceOption": true },
@@ -186,7 +191,8 @@ function generateProtocol(child, pastSessions) {
             'baseDir': 'https://raw.githubusercontent.com/sociallearninglab/social_groups_lookit/main',
             'parentTextBlock': questionParentTextBlockObj
         },
-        'test-question-blue': { 
+
+        'test-question-blue': {
             'kind': 'exp-lookit-images-audio',
             'images': [
                 { "id": 'background', "src": gazorpsTestBgImgFile, "left": 0, "width": 100, "top": 0, "height": 100, 'maximizeDisplay': true, "nonChoiceOption": true },
@@ -199,16 +205,18 @@ function generateProtocol(child, pastSessions) {
             'baseDir': 'https://raw.githubusercontent.com/sociallearninglab/social_groups_lookit/main',
             'parentTextBlock': questionParentTextBlockObj
         },
-        'intro-fruits-stim': { 
+        
+        'intro-fruits-stim': { /* ... same, doRecording: false ... */
             'kind': 'exp-lookit-video',
             'video': { 'top': 0, 'left': 0, 'width': 100, 'source': introFruitsVid, 'loop': false },
             'backgroundColor': 'black', 'autoProceed': true,
             'parentTextBlock': videoParentTextBlockObj,
-            'showPreviousButton': false, 'showReplayButton': true, 
-            'doRecording': false, 
+            'showPreviousButton': false, 'showReplayButton': true,
+            'doRecording': false,
             'baseDir': 'https://raw.githubusercontent.com/sociallearninglab/social_groups_lookit/main', 'videoTypes': ['mp4']
         },
-        'test-question-kiki': { 
+
+        'test-question-kiki': {
             'kind': 'exp-lookit-images-audio',
             'images': [
                 { "id": 'background', "src": fruitsTestBgImgFile, "left": 0, "width": 100, "top": 0, "height": 100, 'maximizeDisplay': true, "nonChoiceOption": true },
@@ -221,7 +229,8 @@ function generateProtocol(child, pastSessions) {
             'baseDir': 'https://raw.githubusercontent.com/sociallearninglab/social_groups_lookit/main',
             'parentTextBlock': questionParentTextBlockObj
         },
-        'test-question-bubba': { 
+
+        'test-question-bubba': {
             'kind': 'exp-lookit-images-audio',
             'images': [
                 { "id": 'background', "src": fruitsTestBgImgFile, "left": 0, "width": 100, "top": 0, "height": 100, 'maximizeDisplay': true, "nonChoiceOption": true },
@@ -229,47 +238,121 @@ function generateProtocol(child, pastSessions) {
                 { "id": 'right-choice', "src": 'answer_rect_blank.png', "left": 54, "width": 30, "top": 4, "height": 92, "correct": !tqbuba_leftCorrect, "feedbackAudio": tqbuba_rightFeedback }
             ],
             'audio': 'question_click_bubba', 'audioTypes': ['mp3', 'ogg'], 'showReplayButton': true, 'choiceRequired': true,
-            'correctChoice': tqbuba_correctChoice, 
+            'correctChoice': tqbuba_correctChoice,
             'correctChoiceRequired': true,
             'backgroundColor': 'black', 'pageColor': 'black', 'doRecording': true,
             'baseDir': 'https://raw.githubusercontent.com/sociallearninglab/social_groups_lookit/main',
             'parentTextBlock': questionParentTextBlockObj
         },
-        'snack-time-stim': { 
+
+        'snack-time-stim-p1': {
             'kind': 'exp-lookit-video',
-            'video': { 'top': 0, 'left': 0, 'width': 100, 'source': snackTimeVid, 'loop': false },
+            'video': { 'top': 0, 'left': 0, 'width': 100, 'source': snackTimeVidP1, 'loop': false },
+            'backgroundColor': 'black', 'autoProceed': false,
+            'parentTextBlock': videoParentTextBlockObj,
+            'showPreviousButton': false, 'showReplayButton': true, 'doRecording': true,
+            'baseDir': 'https://raw.githubusercontent.com/sociallearninglab/social_groups_lookit/main', 'videoTypes': ['mp4']
+        },
+        'snack-time-halfway': {
+            'kind': 'exp-lookit-video',
+            'video': { 'top': 0, 'left': 0, 'width': 100, 'source': 'gazorps_snacktime_halfway', 'loop': false },
+            'backgroundColor': 'black', 'autoProceed': false,
+            'parentTextBlock': videoParentTextBlockObj,
+            'showPreviousButton': false, 'showReplayButton': true, 'doRecording': true,
+            'baseDir': 'https://raw.githubusercontent.com/sociallearninglab/social_groups_lookit/main', 'videoTypes': ['mp4']
+        },
+        
+        'snack-time-stim-p2': {
+            'kind': 'exp-lookit-video',
+            'video': { 'top': 0, 'left': 0, 'width': 100, 'source': snackTimeVidP2, 'loop': false },
             'backgroundColor': 'black', 'autoProceed': true,
             'parentTextBlock': videoParentTextBlockObj,
             'showPreviousButton': false, 'showReplayButton': true, 'doRecording': true,
             'baseDir': 'https://raw.githubusercontent.com/sociallearninglab/social_groups_lookit/main', 'videoTypes': ['mp4']
         },
-        'test-question-fruit-choice': { 
+
+        'test-question-fruit-choice': {
             'id': 'fruit-choice-question',
             'kind': 'exp-lookit-images-audio',
             'images': [
                 { "id": 'background', "src": snackTimeTestBgImgFile, "left": 0, "width": 100, "top": 0, "height": 100, 'maximizeDisplay': true, "nonChoiceOption": true },
-                { "id": 'left-choice', "src": 'answer_rect_blank.png', "left": 19, "width": 22, "top": 65.5, "height": 34, "correct": true, "feedbackAudio": fruitChoiceLeftFeedback },
-                { "id": 'right-choice', "src": 'answer_rect_blank.png', "left": 59, "width": 22, "top": 65.5, "height": 34, "correct": true, "feedbackAudio": fruitChoiceRightFeedback }
+                { "id": 'left-choice', "src": 'answer_rect_blank.png', "left": 19, "width": 22, "top": 65.5, "height": 34, "correct": true },
+                { "id": 'right-choice', "src": 'answer_rect_blank.png', "left": 59, "width": 22, "top": 65.5, "height": 34, "correct": true }
             ],
             'audio': fruitChoiceQAudio, 'audioTypes': ['mp3', 'ogg'], 'showReplayButton': true, 'choiceRequired': true,
             'backgroundColor': 'black', 'pageColor': 'black', 'doRecording': true,
             'baseDir': 'https://raw.githubusercontent.com/sociallearninglab/social_groups_lookit/main',
             'parentTextBlock': questionParentTextBlockObj
         },
-        'test-question-team-choice': { 
+
+        'test-question-team-choice': {
             'id': 'team-choice-question',
             'kind': 'exp-lookit-images-audio',
             'images': [
                 { "id": 'background', "src": snackTimeTestBgImgFile, "left": 0, "width": 100, "top": 0, "height": 100, 'maximizeDisplay': true, "nonChoiceOption": true },
-                { "id": 'left-choice', "src": 'answer_rect_blank.png', "left": 12, "width": 35, "top": 0, "height": 48, "correct": true, "feedbackAudio": teamChoiceLeftFeedback },
-                { "id": 'right-choice', "src": 'answer_rect_blank.png', "left": 53, "width": 35, "top": 0, "height": 48, "correct": true, "feedbackAudio": teamChoiceRightFeedback }
+                { "id": 'left-choice', "src": 'answer_rect_blank.png', "left": 12, "width": 35, "top": 0, "height": 48, "correct": true },
+                { "id": 'right-choice', "src": 'answer_rect_blank.png', "left": 53, "width": 35, "top": 0, "height": 48, "correct": true }
             ],
             'audio': teamChoiceQAudio, 'audioTypes': ['mp3', 'ogg'], 'showReplayButton': true, 'choiceRequired': true,
             'backgroundColor': 'black', 'pageColor': 'black', 'doRecording': true,
             'baseDir': 'https://raw.githubusercontent.com/sociallearninglab/social_groups_lookit/main',
             'parentTextBlock': questionParentTextBlockObj
         },
-        'test-question-team-choice-why': { 
+        
+        'test-question-team-choice-why': {
+            'kind': 'exp-lookit-images-audio',
+            'images': [{ "id": 'background', "src": snackTimeTestBgImgFile, "left": 0, "width": 100, "top": 0, "height": 100, 'maximizeDisplay': true, "nonChoiceOption": true }],
+            'audioTypes': ['mp3', 'ogg'], 
+            'showReplayButton': true, 
+            'choiceRequired': false, 
+            'durationSeconds': 12,
+            'backgroundColor': 'black', 
+            'pageColor': 'black', 
+            'doRecording': true,
+            'baseDir': 'https://raw.githubusercontent.com/sociallearninglab/social_groups_lookit/main',
+            'parentTextBlock': whyQuestionParentTextBlockObj,
+            'generateProperties': `function(expData, sequence, child, pastSessions) {
+                let lastFrameData = null;
+                let maxIndex = -1;
+                for (const key in expData) {
+                    if (expData.hasOwnProperty(key)) {
+                        const index = parseInt(key.split('-')[0], 10);
+                        if (!isNaN(index) && index > maxIndex) {
+                            maxIndex = index;
+                            lastFrameData = expData[key];
+                        }
+                    }
+                }
+                const choiceData = lastFrameData;
+        
+                let whyAudio = 'why_team_red'; // Default audio
+        
+                const localTeamPresentedFirst = (child.study && child.study.conditions && child.study.conditions.teamPresentedFirst)
+                                                 ? child.study.conditions.teamPresentedFirst
+                                                 : 'Red';
+        
+                if (choiceData && choiceData.selectedImage) {
+                    const selection = choiceData.selectedImage;
+                    let chosenTeam;
+        
+                    if (localTeamPresentedFirst === 'Red') {
+                        chosenTeam = (selection === 'left-choice') ? 'Red' : 'Blue';
+                    } else { // Blue team was presented first
+                        chosenTeam = (selection === 'left-choice') ? 'Blue' : 'Red';
+                    }
+        
+                    if (chosenTeam === 'Red') {
+                        whyAudio = 'why_team_red';
+                    } else {
+                        whyAudio = 'why_team_blue';
+                    }
+                }
+                
+                return { "audio": whyAudio };
+            }`
+        },
+        
+        'test-question-fruit-choice-why': {
             'kind': 'exp-lookit-images-audio',
             'images': [{ "id": 'background', "src": snackTimeTestBgImgFile, "left": 0, "width": 100, "top": 0, "height": 100, 'maximizeDisplay': true, "nonChoiceOption": true }],
             'audioTypes': ['mp3', 'ogg'], 'showReplayButton': true, 'choiceRequired': false, 'durationSeconds': 12,
@@ -277,68 +360,83 @@ function generateProtocol(child, pastSessions) {
             'baseDir': 'https://raw.githubusercontent.com/sociallearninglab/social_groups_lookit/main',
             'parentTextBlock': whyQuestionParentTextBlockObj,
             'generateProperties': `function(expData, sequence, child, pastSessions) {
-                var teamChoiceFrameId = 'team-choice-question'; 
-                var whyAudio = 'why_team_red'; 
-                var choiceData = expData[teamChoiceFrameId];
-                var localTeamPresentedFirst = "Red"; // Default
-                if (child.study && child.study.conditions && typeof child.study.conditions.teamPresentedFirst !== 'undefined') {
-                    localTeamPresentedFirst = child.study.conditions.teamPresentedFirst;
-                }
-
-                if (choiceData && choiceData.choice) {
-                    var chosenPosition = choiceData.choice; 
-                    
-                    if (localTeamPresentedFirst === "Red") { 
-                        if (chosenPosition === "right-choice") { 
-                            whyAudio = 'why_team_blue';
-                        } else { 
-                            whyAudio = 'why_team_red';
-                        }
-                    } else { 
-                        if (chosenPosition === "left-choice") { 
-                            whyAudio = 'why_team_blue';
-                        } else { 
-                            whyAudio = 'why_team_red';
+                let lastFrameData = null;
+                let maxIndex = -1;
+                for (const key in expData) {
+                    if (expData.hasOwnProperty(key)) {
+                        const index = parseInt(key.split('-')[0], 10);
+                        if (!isNaN(index) && index > maxIndex) {
+                            maxIndex = index;
+                            lastFrameData = expData[key];
                         }
                     }
                 }
-                // console.log("generateProperties for why: teamPresentedFirst=" + localTeamPresentedFirst + ", choice=" + (choiceData ? choiceData.choice : 'N/A') + ", finalAudio=" + whyAudio);
+                const choiceData = lastFrameData;
+            
+                let whyAudio = 'why_likes_kiki'; // Default audio
+            
+                const localFruitPresentedFirst = (child.study && child.study.conditions && child.study.conditions.fruitPresentedFirst)
+                                                 ? child.study.conditions.fruitPresentedFirst
+                                                 : 'Kiki';
+            
+                if (choiceData && choiceData.selectedImage) {
+                    const selection = choiceData.selectedImage;
+                    let chosenFruit;
+            
+                    if (localFruitPresentedFirst === 'Kiki') {
+                        chosenFruit = (selection === 'left-choice') ? 'Kiki' : 'Bubba';
+                    } else {
+                        chosenFruit = (selection === 'left-choice') ? 'Bubba' : 'Kiki';
+                    }
+            
+                    if (chosenFruit === 'Kiki') {
+                        whyAudio = 'why_likes_kiki';
+                    } else {
+                        whyAudio = 'why_likes_bubba';
+                    }
+                }
+                
                 return { "audio": whyAudio };
             }`
         }
     };
-    
+
+    // --- 4. Define Experimental Sequence based on conditionType ---
     let experimentalSequence;
-    const coreStimulusBlock = [ 
+    let whyBlockConditional; // This will hold the correct "why" question frame
+    // MODIFICATION: Replaced 'snack-time-stim' with the new three-part sequence
+    const coreStimulusBlock = [
         'intro-gazorps-stim', 'test-question-red', 'test-question-blue',
         'intro-fruits-stim', 'test-question-kiki', 'test-question-bubba',
-        'snack-time-stim'
+        'snack-time-stim-p1', 'snack-time-halfway', 'snack-time-stim-p2'
     ];
-    const whyBlock = ['test-question-team-choice-why'];
 
     if (selectedConditionType === "group") {
+        whyBlockConditional = ['test-question-team-choice-why'];
         experimentalSequence = [
             ...coreStimulusBlock,
             'test-question-fruit-choice',
             'test-question-team-choice',
-            ...whyBlock
+            ...whyBlockConditional
         ];
     } else { // pref
+        whyBlockConditional = ['test-question-fruit-choice-why'];
         experimentalSequence = [
             ...coreStimulusBlock,
             'test-question-team-choice',
             'test-question-fruit-choice',
-            ...whyBlock
+            ...whyBlockConditional
         ];
     }
 
-    const protocolSequence = [ 
+    const protocolSequence = [
         'video-config', 'video-consent', 'positioning', 'start-recording',
         'intro-gazoom-fixed',
         ...experimentalSequence,
         'stop-recording', 'exit-survey'
     ];
 
+    // --- Logging for Debugging ---
     console.log("--- generateProtocol ---");
     console.log("Selected Main Study Type:", selectedMainStudyType);
     console.log("Selected Condition Type:", selectedConditionType);
@@ -354,12 +452,15 @@ function generateProtocol(child, pastSessions) {
     console.log("Fruits Test BG Img:", fruitsTestBgImgFile);
     console.log("  test-question-kiki: correctChoice=", tqk_correctChoice, "leftCorrect=", tqk_leftCorrect, "leftFeedback=", tqk_leftFeedback, "rightFeedback=", tqk_rightFeedback);
     console.log("  test-question-bubba: correctChoice=", tqbuba_correctChoice, "leftCorrect=", tqbuba_leftCorrect, "leftFeedback=", tqbuba_leftFeedback, "rightFeedback=", tqbuba_rightFeedback);
-    console.log("Snack Time Video:", snackTimeVid);
+    console.log("Snack Time Video Part 1:", snackTimeVidP1);
+    console.log("Snack Time Video Part 2:", snackTimeVidP2);
     console.log("Snack Time Test BG Img:", snackTimeTestBgImgFile);
-    console.log("Fruit Choice Q Audio:", fruitChoiceQAudio, "LFB:", fruitChoiceLeftFeedback, "RFB:", fruitChoiceRightFeedback);
-    console.log("Team Choice Q Audio:", teamChoiceQAudio, "LFB:", teamChoiceLeftFeedback, "RFB:", teamChoiceRightFeedback);
+    console.log("Fruit Choice Q Audio:", fruitChoiceQAudio);
+    console.log("Team Choice Q Audio:", teamChoiceQAudio);
+    console.log("Selected \"Why\" block will contain:", whyBlockConditional[0]);
     console.log("--- Sequence ---");
     console.log("Protocol Sequence (length " + protocolSequence.length + "):", JSON.stringify(protocolSequence));
+
 
     return {
         frames: frames,
